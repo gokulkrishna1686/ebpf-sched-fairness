@@ -1,0 +1,22 @@
+{
+  "_purpose": "Ablations at medium contention: no aging, no wait feedback (static class boost), threshold sweep, per-task vs per-cgroup input (waitboost-cg), and actuator comparison (nice vs slice vs cgweight).",
+  "mixes": "mixes.json",
+  "use_mixes": ["M1", "M2", "M3"],
+  "contention": {"x2": 2},
+  "policies": ["default",
+               "waitboost-nice", "waitboost-nice-noaging", "waitboost-nice-nofeedback",
+               "waitboost-slice", "waitboost-slice-noaging", "waitboost-slice-nofeedback",
+               "waitboost-cg",
+               "wbs-t250", "wbs-t1000", "wbs-t2000", "wbs-t4000"],
+  "policies_custom": [
+    {"name": "wbs-t250",  "base": "waitboost-slice", "schedmon": {"theta_us": 250}},
+    {"name": "wbs-t1000", "base": "waitboost-slice", "schedmon": {"theta_us": 1000}},
+    {"name": "wbs-t2000", "base": "waitboost-slice", "schedmon": {"theta_us": 2000}},
+    {"name": "wbs-t4000", "base": "waitboost-slice", "schedmon": {"theta_us": 4000}}
+  ],
+  "seeds": [101, 102, 103, 104, 105],
+  "cores": [2],
+  "warmup_s": 5,
+  "duration_s": 30,
+  "isolate_housekeeping": true
+}

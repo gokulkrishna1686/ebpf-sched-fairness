@@ -1,0 +1,13 @@
+{
+  "_purpose": "Instrumentation overhead: no collector vs collector without event streaming vs collector with events, paired by seed; per-program BPF run time via kernel.bpf_stats_enabled.",
+  "mixes": "mixes.json",
+  "use_mixes": ["M1"],
+  "contention": {"x1": 1, "x2": 2, "x4": 4},
+  "policies": ["default-nocollector", "default-noevents", "default"],
+  "seeds": [101, 102, 103, 104, 105],
+  "cores": [2],
+  "warmup_s": 5,
+  "duration_s": 30,
+  "bpf_stats": true,
+  "isolate_housekeeping": true
+}

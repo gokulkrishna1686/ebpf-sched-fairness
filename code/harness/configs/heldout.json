@@ -1,0 +1,13 @@
+{
+  "_purpose": "Generalization: the unseen periodic/lognormal mix M4 with the frozen parameters.",
+  "mixes": "mixes.json",
+  "use_mixes": ["M4"],
+  "contention": {"x1": 1, "x2": 2, "x4": 4},
+  "policies": ["default", "nice", "cgweight", "slice", "waitboost-nice", "waitboost-slice"],
+  "seeds": [101, 102, 103, 104, 105],
+  "cores": [2],
+  "warmup_s": 5,
+  "duration_s": 30,
+  "reference": true,
+  "isolate_housekeeping": true
+}

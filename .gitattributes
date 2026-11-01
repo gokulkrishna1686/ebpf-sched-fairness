@@ -1,0 +1,10 @@
+# Force LF everywhere: scripts and Makefiles are executed inside Linux (VM/WSL).
+* text=auto eol=lf
+*.sh  text eol=lf
+Makefile text eol=lf
+
+*.png  binary
+*.pdf  binary
+*.zst  binary
+*.gz   binary
+*.docx binary

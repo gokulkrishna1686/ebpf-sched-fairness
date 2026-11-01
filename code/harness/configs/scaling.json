@@ -1,0 +1,12 @@
+{
+  "_purpose": "Core-count sensitivity: 1, 2 and 3 experiment cores at medium contention (the VM has 4 vCPUs; CPU 0 is housekeeping).",
+  "mixes": "mixes.json",
+  "use_mixes": ["M1"],
+  "contention": {"x2": 2},
+  "policies": ["default", "nice", "slice", "waitboost-nice", "waitboost-slice"],
+  "seeds": [101, 102, 103, 104, 105],
+  "cores": [1, 2, 3],
+  "warmup_s": 5,
+  "duration_s": 30,
+  "isolate_housekeeping": true
+}

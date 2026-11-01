@@ -1,0 +1,13 @@
+{
+  "_purpose": "2-minute smoke test of the whole pipeline (make quick). Not for results.",
+  "mixes": "mixes.json",
+  "use_mixes": ["M1"],
+  "contention": {"x2": 2},
+  "policies": ["default", "nice", "cgweight", "slice", "waitboost-nice", "waitboost-slice", "waitboost-cg"],
+  "seeds": [1],
+  "cores": [2],
+  "warmup_s": 1,
+  "duration_s": 5,
+  "reference": true,
+  "noise_floor": {"mix": "NOISE", "duration_s": 3}
+}

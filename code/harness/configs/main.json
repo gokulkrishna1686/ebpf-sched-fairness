@@ -1,0 +1,14 @@
+{
+  "_purpose": "Main evaluation grid: 3 contention levels x 3 mixes x 6 policies x 5 evaluation seeds (+ no-batch reference runs and a noise-floor run). Run only after params-frozen.",
+  "mixes": "mixes.json",
+  "use_mixes": ["M1", "M2", "M3"],
+  "contention": {"x1": 1, "x2": 2, "x4": 4},
+  "policies": ["default", "nice", "cgweight", "slice", "waitboost-nice", "waitboost-slice"],
+  "seeds": [101, 102, 103, 104, 105],
+  "cores": [2],
+  "warmup_s": 5,
+  "duration_s": 30,
+  "reference": true,
+  "noise_floor": {"mix": "NOISE", "duration_s": 10},
+  "isolate_housekeeping": true
+}

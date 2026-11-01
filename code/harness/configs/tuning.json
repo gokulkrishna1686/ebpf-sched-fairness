@@ -1,0 +1,23 @@
+{
+  "_purpose": "Parameter tuning on TUNING seeds 1-3 and mixes M1-M2 only. Pick theta (and cpu_cap if needed) from these results, write them to params_frozen.json, tag params-frozen.",
+  "mixes": "mixes.json",
+  "use_mixes": ["M1", "M2"],
+  "contention": {"x2": 2},
+  "policies": ["default", "wbn-t250", "wbn-t500", "wbn-t1000", "wbn-t2000",
+               "wbs-t250", "wbs-t500", "wbs-t1000", "wbs-t2000"],
+  "policies_custom": [
+    {"name": "wbn-t250",  "base": "waitboost-nice",  "schedmon": {"theta_us": 250}},
+    {"name": "wbn-t500",  "base": "waitboost-nice",  "schedmon": {"theta_us": 500}},
+    {"name": "wbn-t1000", "base": "waitboost-nice",  "schedmon": {"theta_us": 1000}},
+    {"name": "wbn-t2000", "base": "waitboost-nice",  "schedmon": {"theta_us": 2000}},
+    {"name": "wbs-t250",  "base": "waitboost-slice", "schedmon": {"theta_us": 250}},
+    {"name": "wbs-t500",  "base": "waitboost-slice", "schedmon": {"theta_us": 500}},
+    {"name": "wbs-t1000", "base": "waitboost-slice", "schedmon": {"theta_us": 1000}},
+    {"name": "wbs-t2000", "base": "waitboost-slice", "schedmon": {"theta_us": 2000}}
+  ],
+  "seeds": [1, 2, 3],
+  "cores": [2],
+  "warmup_s": 3,
+  "duration_s": 20,
+  "isolate_housekeeping": true
+}

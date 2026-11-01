@@ -1,0 +1,8 @@
+{
+  "_note": "Interactive side of each workload mix. The batch side is set per run by the contention level (batch threads per core). M4 is the held-out mix: never used for tuning. slo_ms is used only by the analysis: 5x the median work for request-style mixes, and the 16.7 ms frame budget for the periodic M4.",
+  "M1": {"slo_ms": 5.0,  "interactive": {"tasks": 2, "arrival": "poisson", "rate": 100, "work_us": 1000, "work_dist": "fixed"}},
+  "M2": {"slo_ms": 2.5,  "interactive": {"tasks": 8, "arrival": "poisson", "rate": 50, "work_us": 500, "work_dist": "fixed"}},
+  "M3": {"slo_ms": 2.5,  "interactive": {"tasks": 4, "arrival": "onoff", "rate": 400, "on_ms": 100, "off_ms": 400, "work_us": 500, "work_dist": "lognormal", "work_sigma": 0.5}},
+  "M4": {"slo_ms": 16.7, "interactive": {"tasks": 4, "arrival": "periodic", "period_us": 16667, "jitter_us": 1000, "work_us": 2000, "work_dist": "lognormal", "work_sigma": 0.6}},
+  "NOISE": {"slo_ms": 1.0, "interactive": {"tasks": 1, "arrival": "poisson", "rate": 200, "work_us": 10, "work_dist": "fixed"}}
+}
