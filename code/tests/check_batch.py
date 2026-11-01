@@ -44,6 +44,8 @@ def main():
     if not runs:
         sys.exit(f"no runs under {batch}")
     print(f"batch {batch.name}: {len(runs)} run directories")
+    if cfg.get("pilot"):
+        print("NOTE  pilot batch (4 s runs, 2 seeds): checks the pipeline only; never use its numbers")
 
     hashes = defaultdict(set)
     for d in runs:

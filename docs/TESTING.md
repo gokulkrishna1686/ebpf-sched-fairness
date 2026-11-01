@@ -11,6 +11,16 @@ There are three phases:
 
 **Golden rule:** only Phase 2 numbers go into the paper. Everything in Phase 1 is testing.
 
+**The ladder: short runs first, the long run last.**
+
+| Step | Command | Time | What it proves |
+|---|---|---|---|
+| 1. Quick smoke | `make quick` | ~3 min | The basics work: BPF loads, the workload runs, the policies apply, figures appear |
+| 2. Pilot (dress rehearsal) | `make pilot` | ~1 h | **Every** experiment config, trace validation and the full analysis work end to end (4 s runs, 2 seeds) |
+| 3. Golden run | §2 below | ~9 h | The real results (30 s runs, 5 seeds) |
+
+Do not move up a step until the one below passes.
+
 ---
 
 ## 0. Before you start (everyone)
@@ -47,6 +57,7 @@ There are three phases:
 | T8 | Analysis pipeline on real quick data | C | no | 15 min | T6 |
 | T9 | Host noise gate (golden laptop only) | golden-run owner | yes | 15 min | T6 |
 | T10 | Clean-room rebuild from the docs | D | yes | 1 h | – |
+| T11 | **Pilot**: whole study with short runs | C (own VM), then the golden-run owner (golden machine) | yes | ~1 h | T6 |
 
 ---
 
@@ -250,11 +261,28 @@ Build a **new** VM using only the documents (`code/setup/vm/README.md`, this fil
 
 **Record:** time spent per step, plus every place the docs were unclear or wrong. Fix them in a PR.
 
+### T11: Pilot, the whole study with short runs (C, then the golden-run owner)
+
+```bash
+tmux new -s pilot
+make pilot                   # same as: sudo ./tests/pilot.sh
+```
+
+The pilot runs every config the golden run uses (tuning, main, held-out, ablation, scaling, overhead), with 4-second runs and the first 2 seeds, about 308 runs in total. It then runs trace validation, the batch audits, `tune.py`, all figures and all tables. Every stage prints PASS/FAIL, and it carries on after a failure so one pilot shows every problem.
+
+**Pass:** the last line reads `PILOT: ALL STAGES PASS -> ready for the golden run`. Open the figures in `results/pilot_figures/<timestamp>/`: every figure should exist and look sensible.
+
+**Two things the pilot does *not* tell you:**
+- Its numbers are noisy (4 s runs, 2 seeds), and every figure carries a red "PILOT - NOT RESULTS" watermark. Never put pilot numbers in the paper.
+- Do not pick policy parameters from the pilot. Tuning happens only in the golden run (§2, step 1).
+
+**Run it twice:** first C runs it on their own VM (by Nov 4) to shake out bugs, then the golden-run owner runs it on the **golden machine** just before the golden run, to catch problems specific to that machine.
+
 ---
 
 ## 2. Phase 2: the golden run (designated laptop VM)
 
-Start only when T0–T9 pass on the golden VM. Do not use the laptop while runs are in progress.
+Start only when T0–T9 pass on the golden VM **and the pilot (T11) passes on the golden machine**. Do not use the laptop while runs are in progress.
 
 ### Step 1: Tuning (~25 min), then freeze parameters
 
@@ -383,3 +411,5 @@ Files:       results/raw/<batch>/<run>/{meta.json, schedmon.stderr, wlgen_*.stde
 | T8 | C | | | |
 | T9 | owner | | | hypervisor on/off; calibration spread … |
 | T10 | D | | | doc fixes PR: … |
+| T11 | C | | | pilot on own VM: all stages PASS? duration … |
+| T11 | owner | | | pilot on golden machine: all stages PASS? |

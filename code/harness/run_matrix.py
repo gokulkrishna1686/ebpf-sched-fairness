@@ -100,6 +100,14 @@ def calibrate(wlgen, cpu, trials=9):
     return json.loads(out.stdout)
 
 
+def make_pilot(cfg):
+    """Dress rehearsal: same configs, policies and pipeline, but 4 s runs and the first 2 seeds.
+    Pilot batches are named pilot_* and flagged in config.json; they are never results."""
+    cfg.update(warmup_s=1, duration_s=4, seeds=cfg["seeds"][:2], pilot=True)
+    if cfg.get("noise_floor"):
+        cfg["noise_floor"] = dict(cfg["noise_floor"], duration_s=3)
+
+
 PART_BYTES = 90 * 1024 * 1024  # GitHub rejects files over 100 MB
 
 
@@ -133,13 +141,20 @@ def main():
     ap.add_argument("--only", help="run only run_ids containing this substring")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--pack", action="store_true", help="tar.zst the batch directory at the end")
+    ap.add_argument("--pilot", action="store_true",
+                    help="dress rehearsal: 4 s runs, first 2 seeds, batch named pilot_*; never for results")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
-    name = Path(args.config).stem
+    if args.pilot:
+        make_pilot(cfg)
+    name = ("pilot_" if args.pilot else "") + Path(args.config).stem
     if args.resume:
         batch_dir = Path(args.resume).resolve()
         batch_id = batch_dir.name
+        prev = batch_dir / "config.json"
+        if prev.exists() and bool(json.loads(prev.read_text()).get("pilot")) != args.pilot:
+            sys.exit("run_matrix.py: --pilot must match the batch being resumed")
     else:
         batch_id = args.batch_id or f"{name}_{time.strftime('%Y%m%d-%H%M%S')}"
         batch_dir = CODE / "results" / "raw" / batch_id

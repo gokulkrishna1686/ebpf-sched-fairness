@@ -12,6 +12,11 @@ __pycache__/
 code/results/raw/*/
 code/results/fake/
 code/results/quick_figures/
+code/results/pilot_figures/
+code/results/raw/pilot_*
+code/results/raw/quick_*
+code/results/summary/pilot_*
+code/results/summary/quick_*
 
 # LaTeX build artifacts
 report/*.aux

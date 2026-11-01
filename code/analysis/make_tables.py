@@ -164,12 +164,17 @@ def main():
     args = ap.parse_args()
     S, R, O = Path(args.summary), Path(args.raw), Path(args.out)
     O.mkdir(parents=True, exist_ok=True)
+    ids = [b for b in (args.main, args.heldout, args.overhead, args.ablation) if b]
+    note = ""
+    if any(b.startswith(("pilot_", "fake")) for b in ids):
+        print("WARNING: pilot/synthetic batch: these tables are NOT results; never copy them into report/")
+        note = "\\textbf{[PILOT/SYNTHETIC -- NOT RESULTS]} "
     macros = []
     if args.main:
         cells, paired = read(S, args.main, "cells"), read(S, args.main, "paired")
         (O / "tab_main.tex").write_text(main_table(
             cells, paired, args.conts.split(","),
-            "Main results: median over 5 paired seeds with 95\\% bootstrap CI; ratios are paired with B0.",
+            note + "Main results: median over 5 paired seeds with 95\\% bootstrap CI; ratios are paired with B0.",
             "tab:main"))
         macros.append(number_macros("main", cells, paired))
         si, cal = R / args.main / "sysinfo.json", R / args.main / "calibration.json"
@@ -179,7 +184,7 @@ def main():
     if args.heldout:
         cells, paired = read(S, args.heldout, "cells"), read(S, args.heldout, "paired")
         (O / "tab_heldout.tex").write_text(main_table(
-            cells, paired, ["x1", "x2", "x4"], "Held-out mix M4 (never used for tuning).", "tab:heldout"))
+            cells, paired, ["x1", "x2", "x4"], note + "Held-out mix M4 (never used for tuning).", "tab:heldout"))
         macros.append(number_macros("heldout", cells, paired))
     if args.overhead:
         (O / "tab_overhead.tex").write_text(overhead_table(read(S, args.overhead, "cells"),

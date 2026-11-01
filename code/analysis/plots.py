@@ -39,8 +39,14 @@ def plain_log(ax, axis="x"):
     a.set_minor_formatter(matplotlib.ticker.NullFormatter())
 
 
+WATERMARK = None  # set for pilot / synthetic batches so such figures can never pass as results
+
+
 def save(fig, out, name):
     out.mkdir(parents=True, exist_ok=True)
+    if WATERMARK:
+        fig.text(0.5, 0.5, WATERMARK, ha="center", va="center", rotation=25, fontsize=26,
+                 color=style.CRITICAL, alpha=0.18, weight="bold", zorder=100)
     fig.savefig(out / f"{name}.pdf")
     fig.savefig(out / f"{name}.png", dpi=200)
     plt.close(fig)
@@ -124,7 +130,7 @@ def fig_pareto(paired, out, name, conts=("x2", "x4"), policies=MAIN_POLICIES):
             _pareto_panel(axes[i, j], p[(p.mix == mix) & (p.contention == cont)], f"{mix}, {CONT_LABEL.get(cont, cont)}")
         axes[i, 0].set_ylabel("interactive p99 / B0")
     handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=len(labels), bbox_to_anchor=(0.5, 1.04))
+    fig.legend(handles, labels, loc="upper center", ncol=len(labels), bbox_to_anchor=(0.5, 1.0 + 0.09 / len(conts)))
     fig.tight_layout()
     save(fig, out, name)
 
@@ -309,6 +315,12 @@ def main():
     args = ap.parse_args()
     style.apply()
     S, R, O = Path(args.summary), Path(args.raw), Path(args.out)
+    global WATERMARK
+    ids = [b for b in (args.main, args.heldout, args.ablation, args.overhead, args.scaling) if b]
+    if any(b.startswith("pilot_") for b in ids):
+        WATERMARK = "PILOT - NOT RESULTS"
+    elif any(b.startswith("fake") for b in ids):
+        WATERMARK = "SYNTHETIC - NOT RESULTS"
 
     if args.main:
         cells, paired = read(S, args.main, "cells"), read(S, args.main, "paired")
