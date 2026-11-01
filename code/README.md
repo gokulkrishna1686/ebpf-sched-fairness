@@ -44,6 +44,9 @@ make selftest                          # loads the BPF programs, prints PASS + s
 make quick                             # ~2 min: 8 runs → metrics → figures in results/quick_figures/
 ```
 
+**Testing and the golden run** are described step by step, with pass criteria, in [`../docs/TESTING.md`](../docs/TESTING.md).
+The automated checks are `tests/wlgen_smoke.sh` (no root), `tests/restore_test.py` and `tests/check_batch.py`.
+
 ## Full study (in this order)
 
 ```bash

@@ -64,17 +64,21 @@ selftest: $(BUILD)/schedmon
 	sudo ./$(BUILD)/schedmon --selftest
 
 quick: all
-	sudo $(PYTHON) harness/run_matrix.py harness/configs/quick.json --batch-id $(QUICK_ID)
+	-sudo $(PYTHON) harness/run_matrix.py harness/configs/quick.json --batch-id $(QUICK_ID)
 	sudo chown -R $$(id -u):$$(id -g) results/raw/$(QUICK_ID)
+	@test ! -f results/raw/$(QUICK_ID)/failed_runs.csv || (echo "FAILED RUNS:"; cat results/raw/$(QUICK_ID)/failed_runs.csv)
 	$(MAKE) analyze BATCH=$(QUICK_ID)
 	$(PYTHON) analysis/plots.py --main $(QUICK_ID) --out results/quick_figures/$(QUICK_ID)
 	@echo "figures: results/quick_figures/$(QUICK_ID)"
 
 validate-trace: all
 	sudo $(PYTHON) harness/validate_trace.py
+	sudo chown -R $$(id -u):$$(id -g) results/raw
 
 run: all
-	sudo $(PYTHON) harness/run_matrix.py harness/configs/$(CONFIG).json --pack
+	@test -n "$(CONFIG)" || (echo "usage: make run CONFIG=<name in harness/configs>"; exit 2)
+	sudo $(PYTHON) harness/run_matrix.py harness/configs/$(CONFIG).json --pack; \
+		status=$$?; sudo chown -R $$(id -u):$$(id -g) results/raw; exit $$status
 
 analyze:
 	@test -n "$(BATCH)" || (echo "usage: make analyze BATCH=<batch id>"; exit 2)

@@ -58,7 +58,10 @@ def read(summary, batch, kind):
 def fig_cdf(raw_batch, mix, out, conts=("x1", "x2", "x4")):
     """Response-time CDF per contention level, requests pooled over the evaluation seeds."""
     runs = [r for r in runs_in(raw_batch) if r.cfg["mix"] == mix]
-    fig, axes = plt.subplots(1, len(conts), figsize=(style.PAGE_W, 1.9), sharey=True)
+    conts = [c for c in conts if any(r.cfg["contention"] == c for r in runs)]
+    if not conts:
+        return
+    fig, axes = plt.subplots(1, len(conts), figsize=(style.PAGE_W * max(len(conts), 2) / 3, 1.9), sharey=True)
     for ax, cont in zip(np.atleast_1d(axes), conts):
         for pol in style.ordered({r.cfg["policy"] for r in runs if r.cfg["contention"] == cont}):
             rts = []
@@ -110,6 +113,9 @@ def fig_pareto(paired, out, name, conts=("x2", "x4"), policies=MAIN_POLICIES):
     if paired is None:
         return
     p = paired[paired.policy.isin(policies)]
+    conts = [c for c in conts if (p.contention == c).any()]
+    if p.empty or not conts:
+        return
     mixes = sorted(p.mix.unique())
     fig, axes = plt.subplots(len(conts), len(mixes), figsize=(style.PAGE_W, 1.85 * len(conts)),
                              squeeze=False, sharey="row")
@@ -311,8 +317,10 @@ def main():
                 fig_cdf(R / args.main, mix, O)
         fig_pareto(paired, O, "pareto_main")
         if cells is not None:
+            loaded = [c for c in ("x4", "x2", "x1") if (cells.contention == c).any()]
             for mix in sorted(cells.mix.unique()):
-                fig_waits(cells, mix, "x4", O)
+                if loaded:  # heaviest contention present (x4 in the main grid)
+                    fig_waits(cells, mix, loaded[0], O)
         runs = read(S, args.main, "runs")
         rid = args.timeline_run
         if rid is None and runs is not None:

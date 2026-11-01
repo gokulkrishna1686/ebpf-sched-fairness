@@ -15,7 +15,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 PKGS=(
-	build-essential make pkg-config git zstd jq
+	build-essential make pkg-config git zstd jq tmux
 	clang libbpf-dev libelf-dev zlib1g-dev bpftool
 	bpftrace trace-cmd stress-ng
 	python3 python3-numpy python3-pandas python3-scipy python3-matplotlib

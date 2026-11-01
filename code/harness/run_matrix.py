@@ -100,6 +100,31 @@ def calibrate(wlgen, cpu, trials=9):
     return json.loads(out.stdout)
 
 
+PART_BYTES = 90 * 1024 * 1024  # GitHub rejects files over 100 MB
+
+
+def pack(batch_dir):
+    """<batch>.tar.zst (high compression), split into 90 MB .partNN files if needed, plus SHA-256.
+
+    Restore with:  cat <batch>.tar.zst.part* > <batch>.tar.zst && tar --zstd -xf <batch>.tar.zst
+    """
+    tar = batch_dir.with_name(batch_dir.name + ".tar.zst")
+    subprocess.run(["tar", "-I", "zstd -19 -T0", "-cf", str(tar), "-C", str(batch_dir.parent), batch_dir.name],
+                   check=True)
+    digest = subprocess.run(["sha256sum", tar.name], cwd=tar.parent, capture_output=True, text=True).stdout
+    tar.with_name(tar.name + ".sha256").write_text(digest)
+    if tar.stat().st_size > PART_BYTES:
+        with open(tar, "rb") as f:
+            k = 0
+            while chunk := f.read(PART_BYTES):
+                tar.with_name(f"{tar.name}.part{k:02d}").write_bytes(chunk)
+                k += 1
+        tar.unlink()
+        print(f"packed {tar.name} into {k} parts of <= 90 MB (+ .sha256 of the whole archive)")
+    else:
+        print("packed", tar)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("config")
@@ -210,10 +235,7 @@ def main():
         os.sched_setaffinity(0, cpu_set(0, os.cpu_count()))
 
     if args.pack:
-        tar = batch_dir.with_suffix(".tar.zst")
-        subprocess.run(["tar", "--zstd", "-cf", str(tar), "-C", str(batch_dir.parent), batch_dir.name],
-                       check=True)
-        print("packed", tar)
+        pack(batch_dir)
     n_bad = sum(1 for r in index if r["status"] != "ok")
     print(f"done: {len(index)} runs, {n_bad} failed")
     return 1 if n_bad else 0

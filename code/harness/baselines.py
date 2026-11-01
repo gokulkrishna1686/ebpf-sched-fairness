@@ -87,7 +87,10 @@ def resolve(name, use_frozen=True):
     pol = copy.deepcopy(POLICIES[name])
     sm = pol.get("schedmon")
     if sm and sm.get("policy") == "waitboost" and use_frozen:
-        pol["schedmon"] = _merge(frozen_params(), sm)
+        frozen = frozen_params()
+        per_actuator = frozen.pop("by_actuator", {})  # e.g. {"nice": {"theta_us": 1000}}
+        base = _merge(frozen, per_actuator.get(sm.get("actuator", "nice"), {}))
+        pol["schedmon"] = _merge(base, sm)  # explicit policy options (e.g. a theta sweep) win
     pol.setdefault("collector", True)
     return pol
 

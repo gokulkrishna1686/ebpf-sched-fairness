@@ -119,15 +119,34 @@ def check_threads(path):
               f"{g.rel_err.abs().median():.3%} p95={g.rel_err.abs().quantile(.95):.3%}")
 
 
+def check_noise(batch_dir):
+    """Idle wake-up latency of the noise-floor run: the timing noise the platform adds by itself."""
+    d = Path(batch_dir) / "noise_floor"
+    rq = pd.read_csv(d / "requests.csv")
+    m = rq[rq.measured == 1]
+    lag = (m.t_start_ns - m.t_arrival_ns).to_numpy() / 1e3
+    ev = d / "events.csv"
+    w = pd.read_csv(ev).wait_ns.to_numpy() / 1e3 if ev.exists() else np.array([])
+    print(f"noise floor ({len(lag)} idle wake-ups): wake-up lag p50 {np.median(lag):.1f} µs, "
+          f"p99 {np.quantile(lag, .99):.1f} µs, p99.9 {np.quantile(lag, .999):.1f} µs, max {lag.max():.1f} µs")
+    if len(w):
+        print(f"run-queue wait of the idle task: p99 {np.quantile(w, .99):.1f} µs, max {w.max():.1f} µs")
+    verdict = "OK" if np.quantile(lag, .99) < 1000 else "TOO NOISY (p99 >= 1 ms): fix the host before the golden run"
+    print("verdict:", verdict)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--trace")
-    ap.add_argument("--threads")
+    ap.add_argument("--trace", help="validation_<ts> directory from harness/validate_trace.py")
+    ap.add_argument("--threads", help="<batch>_threads.csv from analysis/metrics.py")
+    ap.add_argument("--noise", help="batch directory that contains a noise_floor run")
     args = ap.parse_args()
     if args.trace:
         check_trace(args.trace)
     if args.threads:
         check_threads(args.threads)
+    if args.noise:
+        check_noise(args.noise)
 
 
 if __name__ == "__main__":

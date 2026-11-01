@@ -49,7 +49,7 @@ def main():
         _wait_ready(sm, 30)
         tc = subprocess.Popen(["trace-cmd", "record", "-C", "mono", "-e", "sched:sched_switch",
                                "-e", "sched:sched_wakeup", "-e", "sched:sched_wakeup_new",
-                               "-M", str(1 << args.cpu), "-o", str(out / "trace.dat")],
+                               "-M", format(1 << args.cpu, "x"), "-o", str(out / "trace.dat")],  # hex cpumask
                               stdout=open(out / "trace-cmd.stdout", "w"), stderr=subprocess.STDOUT)
         procs.append(tc)
         time.sleep(2.0)  # trace-cmd needs a moment to start recording

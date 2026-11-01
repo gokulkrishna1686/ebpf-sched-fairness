@@ -1,5 +1,5 @@
 {
-  "_status": "PROVISIONAL defaults. Replace with the values chosen from tuning.json (seeds 1-3, mixes M1-M2 only), commit, then tag the commit params-frozen before any evaluation run.",
+  "_status": "PROVISIONAL defaults. After the tuning run, write the output of analysis/tune.py here, commit, then tag the commit params-frozen before any evaluation run.",
   "interval_ms": 10,
   "theta_us": 500,
   "alpha": 0.3,
@@ -8,5 +8,9 @@
   "max_level": 3,
   "decay_ms": 50,
   "guard_ms": 100,
-  "nice_step": 3
+  "nice_step": 3,
+  "by_actuator": {
+    "nice": {},
+    "slice": {}
+  }
 }
