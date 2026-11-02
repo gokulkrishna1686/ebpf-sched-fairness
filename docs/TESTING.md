@@ -1,6 +1,8 @@
 # Testing and Results Runbook
 
 How the team tests the code in the VM, then produces the results that go into the paper.
+
+> **New to this?** Start with [**TEST_GUIDE.md**](TEST_GUIDE.md). It's a step-by-step tutorial for every test: what it checks, how it works, how long it takes, example output, and what to do if it fails. This file is the checklist: who does what, the sign-off table and the golden run.
 There are three phases:
 
 | Phase | Where | When | Who |

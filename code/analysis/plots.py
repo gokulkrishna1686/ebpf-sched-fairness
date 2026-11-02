@@ -319,6 +319,8 @@ def main():
     ids = [b for b in (args.main, args.heldout, args.ablation, args.overhead, args.scaling) if b]
     if any(b.startswith("pilot_") for b in ids):
         WATERMARK = "PILOT - NOT RESULTS"
+    elif any(b.startswith("quick_") for b in ids):
+        WATERMARK = "TEST RUN - NOT RESULTS"
     elif any(b.startswith("fake") for b in ids):
         WATERMARK = "SYNTHETIC - NOT RESULTS"
 

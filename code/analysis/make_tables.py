@@ -166,9 +166,9 @@ def main():
     O.mkdir(parents=True, exist_ok=True)
     ids = [b for b in (args.main, args.heldout, args.overhead, args.ablation) if b]
     note = ""
-    if any(b.startswith(("pilot_", "fake")) for b in ids):
-        print("WARNING: pilot/synthetic batch: these tables are NOT results; never copy them into report/")
-        note = "\\textbf{[PILOT/SYNTHETIC -- NOT RESULTS]} "
+    if any(b.startswith(("pilot_", "quick_", "fake")) for b in ids):
+        print("WARNING: test/pilot/synthetic batch: these tables are NOT results; never copy them into report/")
+        note = "\\textbf{[TEST DATA -- NOT RESULTS]} "
     macros = []
     if args.main:
         cells, paired = read(S, args.main, "cells"), read(S, args.main, "paired")

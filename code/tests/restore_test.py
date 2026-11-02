@@ -93,18 +93,31 @@ def main():
         before = {t: fair_params(t) for t in tids}
         w_before = cg.weight("interactive")
         print(f"interactive tids {tids}; start values {before}; interactive cpu.weight {w_before}")
+        check("interactive threads found and readable", bool(tids) and all(before.values()))
+        if not results[-1]:
+            raise SystemExit("cannot continue without the interactive threads")
 
-        time.sleep(5.0)
-        during = {t: fair_params(t) for t in tids}
-        w_during = cg.weight("interactive")
+        # Levels rise and decay every few tens of ms, so sample for 5 s and keep the strongest boost seen.
+        min_nice = min_slice = None
+        max_w = w_before
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            for t in tids:
+                p = fair_params(t)
+                if p:
+                    min_nice = p[0] if min_nice is None else min(min_nice, p[0])
+                    min_slice = p[1] if min_slice is None else min(min_slice, p[1])
+            max_w = max(max_w, cg.weight("interactive") or 0)
+            time.sleep(0.05)
         if args.actuator == "nice":
-            check("boost visible during run (some nice < original)",
-                  any(during[t][0] < before[t][0] for t in tids), str(during))
+            check("boost seen during run (nice went below original)",
+                  min_nice is not None and min_nice < min(v[0] for v in before.values()), f"lowest nice {min_nice}")
         elif args.actuator == "slice":
-            check("boost visible during run (some slice < original)",
-                  any(during[t][1] < before[t][1] for t in tids), str(during))
+            check("boost seen during run (slice went below original)",
+                  min_slice is not None and min_slice < min(v[1] for v in before.values()),
+                  f"shortest slice {min_slice} ns")
         else:
-            check("boost visible during run (cpu.weight raised)", w_during > w_before, f"{w_before} -> {w_during}")
+            check("boost seen during run (cpu.weight raised)", max_w > w_before, f"{w_before} -> max {max_w}")
 
         sm.send_signal(signal.SIGTERM)
         rc = sm.wait(timeout=30)
@@ -122,7 +135,17 @@ def main():
 
     log = (out / "policy_log.csv").read_text().splitlines() if (out / "policy_log.csv").exists() else []
     check("policy_log has boost rows", any(",boost," in line for line in log), f"({len(log) - 1} rows)")
-    check("policy_log has restore rows", any(",restore," in line for line in log))
+    # A restore row is written only for threads still boosted at exit; check that every such thread got one.
+    last_level, restored = {}, set()
+    for line in log[1:]:
+        f = line.split(",")  # t_ns,tid,class,action,level_from,level_to,...
+        if f[3] == "restore":
+            restored.add(f[1])
+        else:
+            last_level[f[1]] = int(f[5])
+    still_boosted = {tid for tid, lvl in last_level.items() if lvl > 0}
+    check("every thread boosted at exit has a restore row", still_boosted <= restored,
+          f"(boosted at exit: {sorted(still_boosted)}, restored: {sorted(restored)})")
     st = json.loads((out / "schedmon_stats.json").read_text()) if (out / "schedmon_stats.json").exists() else {}
     check("restore_errors == 0", st.get("restore_errors") == 0, str(st.get("restore_errors")))
     check("actuator_errors == 0", st.get("actuator_errors") == 0, str(st.get("actuator_errors")))
