@@ -18,7 +18,9 @@
  *   decay  - otherwise a boosted thread loses one level every --decay-ms (aging).
  * Actuators map a level L to a kernel knob:
  *   nice     - nice = original - L * --nice-step                         (changes weight)
- *   slice    - EEVDF slice request = max(0.1 ms, base_slice >> L)       (changes deadline)
+ *   slice    - EEVDF slice request = base_slice >> L, but at least 1.25 x the task's typical
+ *              CPU burst (so a boosted request is not cut mid-burst), within [0.1 ms, base]
+ *                                                                     (changes deadline)
  *   cgweight - per-cgroup variant: the interactive class's aggregate wait drives
  *              cpu.weight = original << L of the interactive cgroup.
  * On exit every changed knob is restored.
@@ -54,6 +56,7 @@
 #define MAX_TRACKED 4096
 #define ALPHA_CLASS 0.2 /* smoothing of sleep/cpu fractions (~50 ms horizon at 10 ms ticks) */
 #define MIN_SLICE_NS 100000ULL
+#define BURST_MARGIN 1.25 /* a boosted slice is at least this many typical bursts long */
 
 enum policy { POL_NONE, POL_WAITBOOST };
 enum actuator { ACT_NICE, ACT_SLICE, ACT_CGWEIGHT };
@@ -79,9 +82,11 @@ struct pstate {
 	__u32 tid;
 	__u8 cls;
 	__u64 start_ns;
-	__u64 prev_t, prev_wait, prev_wait_done, prev_n, prev_run;
-	bool have_frac, have_wait;
+	__u64 prev_t, prev_wait, prev_wait_done, prev_n, prev_run, prev_nvcsw;
+	__u64 burst_acc; /* run time since the last voluntary switch was counted */
+	bool have_frac, have_wait, have_burst;
 	double ewma_wait, ewma_sleep, ewma_cpu;
+	double ewma_burst; /* typical CPU burst per wake-up: run time / voluntary switches */
 	int level;
 	__u64 last_change, guard_until;
 	bool touched;
@@ -300,6 +305,12 @@ static int apply_level(struct pstate *p)
 
 		if (p->level > 0) {
 			slice = base_slice_ns >> p->level;
+			/* Never shorter than the task's typical CPU burst: a slice that ends mid-burst gets
+			 * the request preempted and queued behind a full batch slice (seen in the pilot). */
+			if (p->have_burst && slice < (__u64)(BURST_MARGIN * p->ewma_burst))
+				slice = (__u64)(BURST_MARGIN * p->ewma_burst);
+			if (slice > base_slice_ns)
+				slice = base_slice_ns;
 			if (slice < MIN_SLICE_NS)
 				slice = MIN_SLICE_NS;
 		}
@@ -393,6 +404,7 @@ static void tick_task(const struct task_stats *st, void *arg)
 		p->prev_wait_done = st->wait_sum_ns;
 		p->prev_n = st->n_wait;
 		p->prev_run = run;
+		p->prev_nvcsw = st->nvcsw;
 		return;
 	}
 	dt = now - p->prev_t;
@@ -434,11 +446,26 @@ static void tick_task(const struct task_stats *st, void *arg)
 			p->have_wait = true;
 		}
 	}
+	{
+		/* Typical CPU burst: run time per voluntary switch (a burst cut by preemption still
+		 * ends in one voluntary switch, so its pieces add up to one burst). */
+		__u64 dvol = st->nvcsw - p->prev_nvcsw;
+
+		p->burst_acc += drun;
+		if (dvol > 0) {
+			double b = (double)p->burst_acc / (double)dvol;
+
+			p->ewma_burst = p->have_burst ? ewma(p->ewma_burst, b, ALPHA_CLASS) : b;
+			p->have_burst = true;
+			p->burst_acc = 0;
+		}
+	}
 	p->prev_t = now;
 	p->prev_wait = wait;
 	p->prev_wait_done = st->wait_sum_ns;
 	p->prev_n = st->n_wait;
 	p->prev_run = run;
+	p->prev_nvcsw = st->nvcsw;
 
 	if (st->cls == CLASS_INTERACTIVE) {
 		c->inter_dwait += dwait_done;

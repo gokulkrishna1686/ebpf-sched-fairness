@@ -29,7 +29,7 @@ The file formats and command lines are specified in `code/INTERFACES.md`.
 | B2 `cgweight` | Interactive cgroup weight 400, batch cgroup weight 100 | `cpu.weight` |
 | B3 `slice` | Interactive threads request a 0.3 ms EEVDF slice | `sched_setattr(sched_runtime)` |
 | `waitboost-nice` | WaitBoost; a level lowers nice by 3 | schedmon `--actuator nice` |
-| `waitboost-slice` | WaitBoost; a level halves the slice (≥ 0.1 ms) | schedmon `--actuator slice` |
+| `waitboost-slice` | WaitBoost; a level halves the slice, but never below 1.25 × the task's measured CPU burst (a pilot showed that slices shorter than the request's work cause mid-request preemption) | schedmon `--actuator slice` |
 | `waitboost-cg` | Per-cgroup WaitBoost; a level doubles the interactive `cpu.weight` | schedmon `--actuator cgweight` |
 
 **WaitBoost rules.** Every 10 ms the policy runs these checks in order:
