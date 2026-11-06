@@ -185,6 +185,9 @@ def main():
 
     batch_dir.mkdir(parents=True, exist_ok=True)
     hk = cfg["housekeeping_cpu"]
+    # A batch that was killed hard may have left system/user/init scopes confined to the
+    # housekeeping CPU; undo that first so calibration can use the experiment CPUs.
+    release_housekeeping()
     os.sched_setaffinity(0, {hk})
     (batch_dir / "config.json").write_text(json.dumps(cfg, indent=2) + "\n")
     (batch_dir / "policies.json").write_text(json.dumps(

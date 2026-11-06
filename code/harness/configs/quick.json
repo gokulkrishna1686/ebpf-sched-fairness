@@ -9,5 +9,6 @@
   "warmup_s": 1,
   "duration_s": 5,
   "reference": true,
-  "noise_floor": {"mix": "NOISE", "duration_s": 3}
+  "noise_floor": {"mix": "NOISE", "duration_s": 3},
+  "isolate_housekeeping": true
 }

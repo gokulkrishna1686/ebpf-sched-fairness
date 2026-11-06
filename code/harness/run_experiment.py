@@ -57,7 +57,13 @@ def cpu_set(first, n):
 
 def _affinity(cpus):
     def fn():
-        os.sched_setaffinity(0, cpus)
+        try:
+            os.sched_setaffinity(0, cpus)
+        except OSError:
+            # The parent's cpuset excludes `cpus` (housekeeping isolation confines our own scope to the
+            # housekeeping CPU, e.g. WSL's init.scope): allow any CPU instead. The experiment cgroup's
+            # cpuset confines the process as soon as it joins.
+            os.sched_setaffinity(0, range(os.cpu_count()))
     return fn
 
 
