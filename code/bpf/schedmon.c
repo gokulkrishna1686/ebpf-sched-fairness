@@ -85,6 +85,7 @@ struct pstate {
 	int level;
 	__u64 last_change, guard_until;
 	bool touched;
+	bool gone; /* the thread has exited: never act on it again */
 	int orig_nice;
 	uint64_t orig_slice;
 };
@@ -278,7 +279,10 @@ static int apply_level(struct pstate *p)
 
 	if (!p->touched) {
 		if (fx_get_fair_params((pid_t)p->tid, &p->orig_nice, &p->orig_slice)) {
-			actuator_errors++;
+			if (errno == ESRCH)
+				p->gone = true; /* exited between the map read and now: not an error */
+			else
+				actuator_errors++;
 			return -1;
 		}
 		if (p->orig_slice == base_slice_ns)
@@ -301,7 +305,9 @@ static int apply_level(struct pstate *p)
 		}
 		r = fx_set_fair_params((pid_t)p->tid, p->orig_nice, slice);
 	}
-	if (r && errno != ESRCH)
+	if (r && errno == ESRCH)
+		p->gone = true;
+	else if (r)
 		actuator_errors++;
 	return r;
 }
@@ -314,6 +320,8 @@ static void decide(struct pstate *p, __u64 pend_wait, __u64 now)
 	int old = p->level, action = -1;
 	bool eligible;
 
+	if (p->gone)
+		return;
 	if (pend_wait >= guard && p->level < o.max_level) {
 		p->level = o.max_level;
 		p->guard_until = now + guard;
@@ -344,7 +352,10 @@ static void decide(struct pstate *p, __u64 pend_wait, __u64 now)
 	if (action < 0)
 		return;
 	p->last_change = now;
-	apply_level(p);
+	if (apply_level(p) && p->gone) {
+		p->level = old; /* nothing was changed on a thread that no longer exists */
+		return;
+	}
 	log_action(now, p->tid, p->cls, action, old, p->level, p->ewma_wait, p->ewma_sleep, p->ewma_cpu);
 }
 
