@@ -5,6 +5,9 @@
 #   make selftest        sudo ./build/schedmon --selftest
 #   make quick           2-minute end-to-end smoke test: runs -> metrics -> figures (needs root)
 #   make pilot           ~1 h dress rehearsal of the whole study: every config, 4 s runs (needs root)
+#   make golden          ~9 h real study: tune+freeze, all evaluation batches, figures, tables (needs root)
+#                        resume an interrupted one with: make golden TS=<timestamp>
+
 #   make validate-trace  schedmon vs raw ftrace capture for the hand check (needs root)
 #   make run CONFIG=main run one experiment config (needs root)
 #   make analyze BATCH=<batch id under results/raw>
@@ -32,7 +35,7 @@ BPF_CFLAGS := -O2 -g -Wall -target bpf -D__TARGET_ARCH_$(ARCH) -I$(BUILD) -Ibpf 
 
 QUICK_ID := quick_$(shell date +%Y%m%d-%H%M%S)
 
-.PHONY: all clean check-kernel selftest quick pilot validate-trace run analyze fake
+.PHONY: all clean check-kernel selftest quick pilot golden validate-trace run analyze fake
 
 all: $(BUILD)/wlgen $(BUILD)/schedmon
 
@@ -74,6 +77,9 @@ quick: all
 
 pilot: all
 	sudo ./tests/pilot.sh
+
+golden: all
+	sudo ./tests/golden.sh $(TS)
 
 validate-trace: all
 	sudo $(PYTHON) harness/validate_trace.py

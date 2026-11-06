@@ -286,6 +286,43 @@ The pilot runs every config the golden run uses (tuning, main, held-out, ablatio
 
 Start only when T0–T9 pass on the golden VM **and the pilot (T11) passes on the golden machine**. Do not use the laptop while runs are in progress.
 
+### The one-command way: `make golden` (~9 h)
+
+`make golden` runs Steps 1–4 below automatically:
+1. Tuning.
+2. Freezing the parameters. `tune.py --write` applies the pre-declared rule before any evaluation run starts, and keeps a copy in `results/summary/params_frozen_<TS>.json`.
+3. All five evaluation batches, plus the trace validation.
+4. The batch audits, the analysis, and the paper's figures and tables, written into `report/`.
+
+It works the same way in WSL, in a VM, on native Linux and in the cloud.
+
+**Before you start (Windows host):**
+- Plug in the charger and set the power mode to **Best performance**.
+- **Stop the laptop from sleeping**: Settings → System → Power → Screen and sleep → "When plugged in, put my device to sleep after" → **Never**. If Windows sleeps, WSL or the VM freezes and runs fail.
+- **Pause Windows Update** for 1 day (Settings → Windows Update → Pause), so the laptop doesn't restart overnight.
+- Close other apps.
+
+**Run** (inside WSL or the VM):
+
+```bash
+cd ~/fairexp/code && git pull && tmux new -s golden
+```
+```bash
+make golden
+```
+
+Enter your password once. Then detach with Ctrl+b, d. Come back later with `tmux attach -t golden`.
+
+**At the end** it prints a `GOLDEN RUN SUMMARY` with PASS/FAIL per stage, and `GOLDEN RUN: ALL STAGES PASS`. The full log is in `results/summary/golden_<TS>.log`.
+
+**If it was interrupted** (crash, reboot), resume with the timestamp shown at its start. Finished runs are kept, and the frozen parameters are not re-tuned:
+
+```bash
+make golden TS=<timestamp>
+```
+
+Afterwards, continue with Step 4 (publishing the raw data) and Phase 3. The steps below describe the same work done by hand.
+
 ### Step 1: Tuning (~25 min), then freeze parameters
 
 ```bash

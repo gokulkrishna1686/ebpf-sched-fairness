@@ -17,17 +17,22 @@ The output is the "by_actuator" block for harness/configs/params_frozen.json.
 import argparse
 import json
 import re
+import time
+from pathlib import Path
 
 import pandas as pd
 
 KEY = ["batch_id", "mix", "contention", "cores", "seed"]
 PAT = re.compile(r"^wb([ns])-t(\d+)$")
+FROZEN = Path(__file__).resolve().parents[1] / "harness" / "configs" / "params_frozen.json"
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("runs_csv")
     ap.add_argument("--min-tput", type=float, default=0.97)
+    ap.add_argument("--write", action="store_true", help="store the choice in params_frozen.json")
+    ap.add_argument("--params", default=str(FROZEN), help="params file to update with --write")
     args = ap.parse_args()
 
     runs = pd.read_csv(args.runs_csv)
@@ -69,8 +74,18 @@ def main():
         chosen[act] = {"theta_us": int(pick.theta_us)}
         print(f"\n{act}: θ = {int(pick.theta_us)} µs  (p99 ratio {pick.p99_ratio:.3f}, "
               f"throughput ratio {pick.tput_ratio:.3f}, {int(pick.pairs)} pairs) — {note}")
-    print("\nPut this into harness/configs/params_frozen.json:")
-    print(json.dumps({"by_actuator": chosen}, indent=2))
+    if not args.write:
+        print("\nPut this into harness/configs/params_frozen.json (or rerun with --write):")
+        print(json.dumps({"by_actuator": chosen}, indent=2))
+        return
+    path = Path(args.params)
+    data = json.loads(path.read_text())
+    data["by_actuator"] = chosen
+    data["_status"] = (f"FROZEN {time.strftime('%Y-%m-%d %H:%M')} by analysis/tune.py --write from tuning batch "
+                       f"{runs.batch_id.iloc[0]} (rule: lowest median p99 ratio among thetas whose median "
+                       f"throughput ratio is >= {args.min_tput}). Written before any evaluation batch ran.")
+    path.write_text(json.dumps(data, indent=2) + "\n")
+    print(f"\nfrozen parameters written to {path}: {json.dumps(chosen)}")
 
 
 if __name__ == "__main__":
