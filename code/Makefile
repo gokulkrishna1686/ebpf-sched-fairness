@@ -3,6 +3,7 @@
 #   make                 build everything into build/
 #   make check-kernel    print the kernel features the experiments depend on
 #   make selftest        sudo ./build/schedmon --selftest
+#   make test            all automatic tests (T2-T6, T4) in one go, ~5 min, PASS/FAIL summary (needs root)
 #   make quick           2-minute end-to-end smoke test: runs -> metrics -> figures (needs root)
 #   make pilot           ~1 h dress rehearsal of the whole study: every config, 4 s runs (needs root)
 #   make golden          ~9 h real study: tune+freeze, all evaluation batches, figures, tables (needs root)
@@ -35,7 +36,7 @@ BPF_CFLAGS := -O2 -g -Wall -target bpf -D__TARGET_ARCH_$(ARCH) -I$(BUILD) -Ibpf 
 
 QUICK_ID := quick_$(shell date +%Y%m%d-%H%M%S)
 
-.PHONY: all clean check-kernel selftest quick pilot golden validate-trace run analyze fake
+.PHONY: all clean check-kernel selftest test quick pilot golden validate-trace run analyze fake
 
 all: $(BUILD)/wlgen $(BUILD)/schedmon
 
@@ -74,6 +75,9 @@ quick: all
 	$(MAKE) analyze BATCH=$(QUICK_ID)
 	$(PYTHON) analysis/plots.py --main $(QUICK_ID) --out results/quick_figures/$(QUICK_ID)
 	@echo "figures: results/quick_figures/$(QUICK_ID)"
+
+test: all
+	sudo ./tests/run_all.sh
 
 pilot: all
 	sudo ./tests/pilot.sh

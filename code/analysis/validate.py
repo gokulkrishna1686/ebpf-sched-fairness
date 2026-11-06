@@ -13,6 +13,7 @@ the eBPF event with the same tid whose switch-in time is within 50 µs, and writ
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -98,7 +99,7 @@ def check_trace(d):
     m = pd.DataFrame(rows)
     if m.empty:
         print("no matched waits: check that trace.txt and events.csv cover the same threads")
-        return
+        return False
     m["diff_ns"] = m.ebpf_wait_ns - m.trace_wait_ns
     m.to_csv(d / "validation_waits.csv", index=False)
     lines = open(d / "trace.txt", errors="replace").read().splitlines()
@@ -113,10 +114,14 @@ def check_trace(d):
     md.append("```")
     (d / "validation_hand.md").write_text("\n".join(md) + "\n")
     n_trace = len(tw)
-    print(f"trace waits: {n_trace}, matched to eBPF: {len(m)} ({len(m) / max(n_trace, 1):.1%})")
-    print(f"|diff| median {m.diff_ns.abs().median() / 1e3:.2f} µs, p99 {m.diff_ns.abs().quantile(.99) / 1e3:.2f} µs, "
-          f"max {m.diff_ns.abs().max() / 1e3:.2f} µs")
+    matched = len(m) / max(n_trace, 1)
+    med, p99 = m.diff_ns.abs().median() / 1e3, m.diff_ns.abs().quantile(.99) / 1e3
+    print(f"trace waits: {n_trace}, matched to eBPF: {len(m)} ({matched:.1%})")
+    print(f"|diff| median {med:.2f} µs, p99 {p99:.2f} µs, max {m.diff_ns.abs().max() / 1e3:.2f} µs")
     print(f"wrote {d / 'validation_waits.csv'} and {d / 'validation_hand.md'}")
+    ok = matched >= 0.95 and med <= 5 and p99 <= 20  # pass criteria of test T4
+    print(f"trace validation: {'PASS' if ok else 'FAIL'} (need >= 95% matched, median <= 5 µs, p99 <= 20 µs)")
+    return ok
 
 
 def check_threads(path):
@@ -153,12 +158,12 @@ def main():
     ap.add_argument("--threads", help="<batch>_threads.csv from analysis/metrics.py")
     ap.add_argument("--noise", help="batch directory that contains a noise_floor run")
     args = ap.parse_args()
-    if args.trace:
-        check_trace(args.trace)
+    trace_ok = check_trace(args.trace) if args.trace else True
     if args.threads:
         check_threads(args.threads)
     if args.noise:
         check_noise(args.noise)
+    sys.exit(0 if trace_ok else 1)
 
 
 if __name__ == "__main__":
