@@ -148,7 +148,10 @@ def number_macros(tag, cells, paired):
 
 def read(summary, batch, kind):
     p = summary / f"{batch}_{kind}.csv"
-    return pd.read_csv(p) if p.exists() and p.stat().st_size > 1 else None
+    try:
+        return pd.read_csv(p)
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        return None
 
 
 def main():

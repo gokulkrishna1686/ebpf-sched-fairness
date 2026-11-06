@@ -18,7 +18,7 @@ import sys
 
 KCONFIG_KEYS = [
     "CONFIG_BPF_SYSCALL", "CONFIG_BPF_JIT", "CONFIG_DEBUG_INFO_BTF", "CONFIG_BPF_EVENTS",
-    "CONFIG_SCHEDSTATS", "CONFIG_SCHED_CLASS_EXT", "CONFIG_FAIR_GROUP_SCHED",
+    "CONFIG_SCHEDSTATS", "CONFIG_TASK_DELAY_ACCT", "CONFIG_SCHED_CLASS_EXT", "CONFIG_FAIR_GROUP_SCHED",
     "CONFIG_CGROUP_SCHED", "CONFIG_SCHED_AUTOGROUP", "CONFIG_HZ", "CONFIG_NO_HZ_IDLE",
     "CONFIG_NO_HZ_FULL", "CONFIG_PREEMPT", "CONFIG_PREEMPT_VOLUNTARY", "CONFIG_PREEMPT_NONE",
     "CONFIG_PREEMPT_DYNAMIC", "CONFIG_PREEMPT_LAZY", "CONFIG_SCHED_CORE", "CONFIG_SCHED_SMT",
@@ -107,7 +107,7 @@ def sched_tunables():
     for name in SCHED_DEBUG_FILES:
         out[name] = read(f"/sys/kernel/debug/sched/{name}")
     for name in ["sched_autogroup_enabled", "sched_rt_runtime_us", "sched_rt_period_us",
-                 "sched_schedstats", "bpf_stats_enabled"]:
+                 "sched_schedstats", "task_delayacct", "bpf_stats_enabled"]:
         out[name] = read(f"/proc/sys/kernel/{name}")
     return out
 

@@ -64,7 +64,17 @@ check "kernel $(uname -r) >= 6.12 (EEVDF custom slices)" \
 check "BTF at /sys/kernel/btf/vmlinux" '[[ -r /sys/kernel/btf/vmlinux ]]'
 check "CONFIG_BPF_SYSCALL=y"   'grep -q "^CONFIG_BPF_SYSCALL=y" <<<"$CFG"'
 check "CONFIG_DEBUG_INFO_BTF=y" 'grep -q "^CONFIG_DEBUG_INFO_BTF=y" <<<"$CFG"'
-check "CONFIG_SCHEDSTATS=y"    'grep -q "^CONFIG_SCHEDSTATS=y" <<<"$CFG"'
+# Per-thread run_delay in /proc/<pid>/schedstat is an independent cross-check of the eBPF waits.
+# It needs CONFIG_SCHEDSTATS, or CONFIG_TASK_DELAY_ACCT with delay accounting switched on
+# (some WSL kernels ship without SCHEDSTATS). Without either, only that cross-check is skipped.
+if grep -q "^CONFIG_SCHEDSTATS=y" <<<"$CFG"; then
+	echo "ok    CONFIG_SCHEDSTATS=y"
+elif grep -q "^CONFIG_TASK_DELAY_ACCT=y" <<<"$CFG" && sysctl -qw kernel.task_delayacct=1; then
+	echo "kernel.task_delayacct = 1" > /etc/sysctl.d/90-fairexp.conf
+	echo "ok    schedstat via kernel.task_delayacct=1 (this kernel has no CONFIG_SCHEDSTATS; setting kept in /etc/sysctl.d)"
+else
+	echo "warn  no CONFIG_SCHEDSTATS or TASK_DELAY_ACCT: the schedstat cross-check is skipped (trace validation still works)"
+fi
 check "cgroup v2 with cpu+cpuset" 'grep -qw cpu /sys/fs/cgroup/cgroup.controllers && grep -qw cpuset /sys/fs/cgroup/cgroup.controllers'
 check "bpftool runs" 'bpftool version >/dev/null 2>&1'
 check "clang runs"   'clang --version >/dev/null 2>&1'

@@ -125,9 +125,13 @@ def check_trace(d):
 
 
 def check_threads(path):
-    t = pd.read_csv(path)
-    if t.empty:
-        print("no thread rows")
+    try:
+        t = pd.read_csv(path)
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        t = pd.DataFrame()
+    if t.empty or "role" not in t:
+        print("schedstat cross-check skipped: no per-thread schedstat values "
+              "(this kernel has no CONFIG_SCHEDSTATS and delay accounting is off)")
         return
     t["rel_err"] = (t.ebpf_wait_ns - t.schedstat_delay_ns) / t.schedstat_delay_ns
     for role, g in t.groupby("role"):

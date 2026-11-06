@@ -142,6 +142,8 @@ info  sched_ext available: optional scx baseline possible
 
 **Pass if:** every line starts with `ok`. The `info` line can go either way.
 
+On some WSL kernels the schedstat line reads `ok … via kernel.task_delayacct=1` or `warn … cross-check is skipped`. Both are fine: they only affect one extra cross-check (eBPF vs the kernel's own schedstat counters). The main accuracy test (T4) works either way.
+
 **If it fails:**
 - **The kernel check fails:** you aren't on Ubuntu 26.04 (check with `lsb_release -a`). Make a 26.04 VM.
 - **apt errors:** see "Could not get lock" in Part 0, and check that the VM has internet access.

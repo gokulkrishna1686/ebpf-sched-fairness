@@ -720,16 +720,20 @@ static bool find_task(int fd, pid_t tid, struct task_stats *out)
 #define DELTA_MAX_US 50.0
 
 static bool print_row(const char *name, const struct task_stats *st, __u64 waits, __u64 ebpf_ns, __u64 ref_ns,
-		      int sign)
+		      int sign, bool have_schedstat)
 {
 	double delta_us = waits ? sign * ((double)ebpf_ns - (double)ref_ns) / (double)waits / 1e3 : 0.0;
 	bool ok = waits && delta_us >= DELTA_MIN_US && delta_us <= DELTA_MAX_US;
 
-	printf("  tid %-7u %-8s wakeups=%-5llu waits=%-5llu mean_wait=%7.1fus max_wait=%7.1fus | "
-	       "eBPF %.2f ms vs schedstat %.2f ms -> offset %.1f us/wait %s\n",
-	       st->tid, name, (unsigned long long)st->n_wakeups, (unsigned long long)waits,
-	       waits ? (double)ebpf_ns / (double)waits / 1e3 : 0.0, st->wait_max_ns / 1e3, ebpf_ns / 1e6,
-	       ref_ns / 1e6, delta_us, ok ? "OK" : "MISMATCH");
+	printf("  tid %-7u %-8s wakeups=%-5llu waits=%-5llu mean_wait=%7.1fus max_wait=%7.1fus | ", st->tid, name,
+	       (unsigned long long)st->n_wakeups, (unsigned long long)waits,
+	       waits ? (double)ebpf_ns / (double)waits / 1e3 : 0.0, st->wait_max_ns / 1e3);
+	if (!have_schedstat) {
+		printf("eBPF %.2f ms (no schedstat on this kernel: cross-check skipped)\n", ebpf_ns / 1e6);
+		return waits > 0;
+	}
+	printf("eBPF %.2f ms vs schedstat %.2f ms -> offset %.1f us/wait %s\n", ebpf_ns / 1e6, ref_ns / 1e6, delta_us,
+	       ok ? "OK" : "MISMATCH");
 	return ok;
 }
 
@@ -738,9 +742,9 @@ static int selftest(struct schedmon_bpf *skel)
 	char line[4096], path[4200];
 	struct task_stats base, st;
 	struct ring_buffer *rb;
-	__u64 delay0, ebpf, ref, waits;
+	__u64 delay0, delay_end, ebpf, ref, waits;
 	pid_t main_tid, spin_tid = -1;
-	bool waits_seen = true, all_ok = true;
+	bool waits_seen = true, all_ok = true, have_schedstat;
 	pthread_t th;
 	FILE *f;
 	int cpu = sched_getcpu(), tasks_fd = bpf_map__fd(skel->maps.tasks);
@@ -781,7 +785,11 @@ static int selftest(struct schedmon_bpf *skel)
 	}
 	spin_stop = 1;
 	pthread_join(th, NULL);
-	ref = schedstat_run_delay(main_tid) - delay0;
+	delay_end = schedstat_run_delay(main_tid);
+	ref = delay_end - delay0;
+	/* The sleeper waited ~200 times, so a run_delay of 0 means the kernel does not account it
+	 * (no CONFIG_SCHEDSTATS and delay accounting off): skip only the cross-check. */
+	have_schedstat = delay_end > 0;
 	if (rb)
 		ring_buffer__consume(rb);
 
@@ -794,7 +802,7 @@ static int selftest(struct schedmon_bpf *skel)
 	find_task(tasks_fd, main_tid, &st);
 	ebpf = st.wait_sum_ns - base.wait_sum_ns;
 	waits = st.n_wait - base.n_wait;
-	all_ok &= print_row("sleeper", &st, waits, ebpf, ref, +1); /* waits end at switch-in */
+	all_ok &= print_row("sleeper", &st, waits, ebpf, ref, +1, have_schedstat); /* waits end at switch-in */
 	waits_seen &= waits >= 150;
 
 	/* Spinner: whole life, against the run_delay it read itself just before exiting. */
@@ -811,7 +819,7 @@ static int selftest(struct schedmon_bpf *skel)
 	}
 	if (spin_tid > 0 && find_task(tasks_fd, spin_tid, &st)) {
 		/* waits start at switch-out (preemption) */
-		all_ok &= print_row("spinner", &st, st.n_wait, st.wait_sum_ns, spin_delay_at_exit, -1);
+		all_ok &= print_row("spinner", &st, st.n_wait, st.wait_sum_ns, spin_delay_at_exit, -1, have_schedstat);
 		waits_seen &= st.n_wait >= 150;
 	} else {
 		printf("  spinner not found in the map\n");

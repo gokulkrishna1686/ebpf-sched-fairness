@@ -55,7 +55,10 @@ def save(fig, out, name):
 
 def read(summary, batch, kind):
     p = summary / f"{batch}_{kind}.csv"
-    return pd.read_csv(p) if p.exists() and p.stat().st_size > 1 else None
+    try:
+        return pd.read_csv(p)
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        return None  # e.g. no schedstat rows on a kernel without schedstats
 
 
 # ------------------------------------------------------------------ figures
@@ -236,8 +239,8 @@ def fig_theta(paired, out, prefix="wbs-t", cont="x2"):
 
 
 def fig_validation(threads, out):
-    if threads is None or threads.empty:
-        return
+    if threads is None or threads.empty or "role" not in threads:
+        return  # no schedstat on this kernel: nothing to compare against
     fig, ax = plt.subplots(figsize=(style.COL_W, 2.2))
     for k, (role, g) in enumerate(threads.groupby("role")):
         ax.plot(g.schedstat_delay_ns / 1e6, g.ebpf_wait_ns / 1e6, ls="none", marker=style.MARKERS[k], ms=3,
