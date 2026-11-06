@@ -248,7 +248,13 @@ A `WARN calibration spread > 5%` line is allowed. It means your laptop moves the
 4. Starts a "spinner" thread on the same CPU, which keeps the CPU busy.
 5. Lets the main "sleeper" thread sleep and wake 200 times. Every wake-up has to wait for the spinner.
 
-It then prints what eBPF measured next to `/proc/.../schedstat`. That file is the kernel's own total of run-queue waiting for the same thread, a completely independent source.
+It then prints what eBPF measured next to `/proc/.../schedstat`. That file is the kernel's own total of run-queue waiting for the same thread, a completely independent source. Both totals cover exactly the same time window.
+
+**Why the two numbers are not identical, and what the test checks instead.** schedstat stamps a wait's start and end when the scheduler is *entered*. eBPF stamps them at the moment of the actual switch, a few µs later, after the scheduler has picked the next task. Call that gap the *offset*. It works in opposite directions for the two threads:
+- **Sleeper:** its waits *end* with a switch-in, so eBPF counts the offset extra on every wait.
+- **Spinner:** its waits *start* with a switch-out (it gets preempted), so eBPF counts the offset less on every wait.
+
+The selftest works out the offset per wait from each row. Both must come out small and positive, between −2 and 50 µs. In our WSL test they were 5.4 µs and 8.6 µs. Under real contention, where waits are milliseconds long, this offset makes almost no difference: batch threads agreed with schedstat within 0.04 %. The exact wait-by-wait comparison, using the very same tracepoints, is T4.
 
 **Time:** 5 minutes, and the test itself takes a few seconds.
 
@@ -260,20 +266,18 @@ cd ~/fairexp/code && make selftest 2>&1 | tee ~/T3.log
 **What you should see:**
 ```
 schedmon selftest: tracking cgroup /sys/fs/cgroup/user.slice/user-1000.slice/session-2.scope, pinned to CPU 1
-  events emitted=1043 dropped=0
-  tid 5021    sleeper  wakeups=212   waits=402   mean_wait=  431.2us max_wait= 2071.5us run=    1.9ms vcsw=201 ivcsw=201 | schedstat run_delay=  173.4ms ebpf=  173.3ms
-  tid 5022    spinner  wakeups=1     waits=203   mean_wait= 1210.0us max_wait= 2800.0us run=  420.3ms vcsw=0 ivcsw=203 | schedstat run_delay=    0.0ms ebpf=  245.6ms
-  (spinner schedstat reads 0 after it exits; compare the sleeper row)
+  events emitted=409 dropped=0
+  tid 689     sleeper  wakeups=203   waits=202   mean_wait=    6.8us max_wait=  215.2us | eBPF 1.37 ms vs schedstat 0.27 ms -> offset 5.4 us/wait OK
+  tid 690     spinner  wakeups=1     waits=203   mean_wait=    8.9us max_wait=  214.3us | eBPF 1.80 ms vs schedstat 3.55 ms -> offset 8.6 us/wait OK
 selftest PASS
 ```
 
 **Pass if:**
 - The output ends with `selftest PASS`.
 - `dropped=0`.
-- The sleeper has at least 150 waits.
-- On the **sleeper** row, `ebpf=` is within **5 %** of `schedstat run_delay=`, or within 0.5 ms when both are tiny.
+- Both rows say `OK`.
 
-Ignore the spinner's schedstat value: that thread has already exited, so the kernel file reads 0.
+The selftest checks the wait counts and the offsets itself.
 
 **If it fails:**
 - **`failed to load BPF programs`:** run this and send the file. It contains the kernel's verifier log:
@@ -281,8 +285,9 @@ Ignore the spinner's schedstat value: that thread has already exited, so the ker
   sudo ./build/schedmon --selftest --verbose 2>&1 | tail -80 > ~/T3-verbose.log
   ```
 - **`attach failed`:** your kernel isn't Ubuntu 26.04's (see T0).
+- **`MISMATCH`:** run it twice more. If it repeats, send `~/T3.log`.
 
-**Record:** the sleeper's two totals, `ebpf=` and `schedstat run_delay=`.
+**Record:** both rows' offsets (µs per wait).
 
 ---
 
@@ -366,10 +371,11 @@ This is the assignment's safety requirement ("automatic return to the default sc
 
 **How it works:**
 1. `tests/restore_test.py` puts 2 interactive tasks and 4 batch threads on one CPU, so the interactive tasks have to wait.
-2. It starts schedmon with WaitBoost and a deliberately low threshold, so boosts are guaranteed.
-3. For 5 seconds it repeatedly reads the interactive tasks' nice value and slice (the same system call `chrt` uses), or the cgroup weight, and keeps the strongest boost it sees.
-4. It stops schedmon while the workload keeps running, and reads everything again: all values must be back to their originals.
-5. It checks schedmon's own log for errors.
+2. It reads the interactive tasks' **original** nice value and slice (the same system call `chrt` uses), and the cgroup weight, *before* schedmon starts.
+3. It starts schedmon with WaitBoost and a deliberately low threshold, so boosts are guaranteed.
+4. For 5 seconds it keeps reading the same values and keeps the strongest boost it sees.
+5. It stops schedmon while the workload keeps running, and reads everything again: all values must be back to their originals.
+6. It checks schedmon's own log for errors.
 
 **Time:** about 15 seconds per run, so under 1 minute for all three.
 
@@ -386,10 +392,10 @@ sudo python3 tests/restore_test.py --actuator cgweight 2>&1 | tee ~/T5-cgweight.
 
 **What you should see** (nice):
 ```
-interactive tids [6101, 6102]; start values {6101: (0, 2100000), 6102: (0, 2100000)}; interactive cpu.weight 100
+interactive tids [6101, 6102]; original values {6101: (0, 2800000), 6102: (0, 2800000)}; interactive cpu.weight 100
 PASS  boost seen during run (nice went below original) lowest nice -9
 PASS  schedmon exited cleanly rc=0
-PASS  all nice/slice values restored while workload still runs {6101: (0, 2100000), 6102: (0, 2100000)}
+PASS  all nice/slice values restored while workload still runs {6101: (0, 2800000), 6102: (0, 2800000)}
 PASS  cgroup weight restored 100
 PASS  workload still running at restore check
 PASS  policy_log has boost rows (37 rows)
@@ -400,7 +406,7 @@ PASS  actuator_errors == 0 0
 restore_test (nice): ALL PASS   files: /home/you/fairexp/code/results/raw/restoretest_nice_...
 ```
 
-The pairs like `(0, 2100000)` are (nice, slice in ns). For slice, expect "shortest slice" well below the original; for cgweight, expect "100 -> max 800" or similar.
+The pairs like `(0, 2800000)` are (nice, slice in ns). The default slice depends on the number of CPUs: 2.8 ms with 8 or more, about 2.1 ms on a 4-CPU VM. For slice, expect "shortest slice" well below the original; for cgweight, expect "100 -> max 800" or similar.
 
 **Pass if:** all three runs end with `ALL PASS`.
 

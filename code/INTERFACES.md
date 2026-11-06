@@ -65,8 +65,10 @@ Each thread entry has `idx`, `tid`, `nice_readback`, `slice_readback_ns` and `se
 
 ### tasks.csv (schedmon)
 
-`tid,tgid,comm,class,n_wakeups,n_wait,wait_sum_ns,wait_max_ns,run_ns,nvcsw,nivcsw,migrations,h00..h26`
+`tid,ktid,tgid,comm,class,n_wakeups,n_wait,wait_sum_ns,wait_max_ns,run_ns,nvcsw,nivcsw,migrations,h00..h26`
 
+- `tid` / `tgid`: thread and process ids as seen inside the PID namespace that the experiment runs in, i.e. what `gettid()` returns. Every other file uses these ids.
+- `ktid`: the kernel's id for the same thread, as raw ftrace (trace-cmd) prints it. It equals `tid` on a normal VM or bare metal. It differs inside containers and WSL, which run Ubuntu in their own PID namespace.
 - `n_wait` / `wait_*`: run-queue waits (wake-up → run, or preemption → run again).
 - `run_ns`: on-CPU time seen by the tracer.
 - `nvcsw` / `nivcsw`: voluntary and involuntary switches out.
@@ -78,6 +80,7 @@ Counters cover the **whole run, warm-up included**. Use `events.csv` for windowe
 
 `ts_ns,tid,class,cpu,wait_ns,kind`
 
+- `tid`: the namespace-local id, the same as `tasks.csv`.
 - `ts_ns`: when the task got the CPU.
 - `kind`: `0` = after a wake-up, `1` = after a preemption (the task was still runnable), `2` = a newly forked task.
 

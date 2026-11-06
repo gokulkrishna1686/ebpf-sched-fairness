@@ -94,10 +94,10 @@ def make_run(out, batch_id, mix, cont, pol, cores, seed, dur, warm, block, order
     for tid, g in evdf.groupby("tid"):
         cls = int(g["class"].iloc[0])
         h = log2_hist(g.wait_ns)
-        trows.append([tid, 999, "wlgen", cls, len(g), len(g), int(g.wait_ns.sum()), int(g.wait_ns.max()),
+        trows.append([tid, tid, 999, "wlgen", cls, len(g), len(g), int(g.wait_ns.sum()), int(g.wait_ns.max()),
                       int(dur * 1e9 * .3), len(g) if cls == 1 else len(g) // 10, 0 if cls == 1 else len(g),
                       int(rng.integers(0, 50))] + list(h))
-    cols = ["tid", "tgid", "comm", "class", "n_wakeups", "n_wait", "wait_sum_ns", "wait_max_ns", "run_ns", "nvcsw",
+    cols = ["tid", "ktid", "tgid", "comm", "class", "n_wakeups", "n_wait", "wait_sum_ns", "wait_max_ns", "run_ns", "nvcsw",
             "nivcsw", "migrations"] + [f"h{i:02d}" for i in range(HIST)]
     pd.DataFrame(trows, columns=cols).to_csv(d / "tasks.csv", index=False)
 

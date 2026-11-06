@@ -21,8 +21,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CODE = HERE.parent
 sys.path.insert(0, str(HERE))
+sys.dont_write_bytecode = True  # runs as root: don't leave root-owned __pycache__ dirs behind
 from cgroups import ExperimentCgroups  # noqa: E402
-from run_experiment import _wait_ready  # noqa: E402
+from run_experiment import _wait_ready, give_to_invoker  # noqa: E402
 
 
 def main():
@@ -47,9 +48,11 @@ def main():
                               stdout=subprocess.PIPE, stderr=open(out / "schedmon.stderr", "w"))
         procs.append(sm)
         _wait_ready(sm, 30)
+        # Record ALL CPUs: a task pinned to one CPU can still be woken from another CPU, and that
+        # sched_wakeup record lands on the waker's CPU (schedmon sees all CPUs too).
         tc = subprocess.Popen(["trace-cmd", "record", "-C", "mono", "-e", "sched:sched_switch",
                                "-e", "sched:sched_wakeup", "-e", "sched:sched_wakeup_new",
-                               "-M", format(1 << args.cpu, "x"), "-o", str(out / "trace.dat")],  # hex cpumask
+                               "-o", str(out / "trace.dat")],
                               stdout=open(out / "trace-cmd.stdout", "w"), stderr=subprocess.STDOUT)
         procs.append(tc)
         time.sleep(2.0)  # trace-cmd needs a moment to start recording
@@ -76,6 +79,7 @@ def main():
         subprocess.run(["trace-cmd", "report", "-t", "-R", "-i", str(out / "trace.dat")], stdout=f, check=False)
     (out / "meta.json").write_text(json.dumps({"run_id": out.name, "kind": "validation", "cpu": args.cpu,
                                                "seconds": args.seconds, "status": "validation"}, indent=2))
+    give_to_invoker(out)
     print("validation capture in", out)
 
 

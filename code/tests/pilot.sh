@@ -50,7 +50,8 @@ stage "tables" python3 analysis/make_tables.py --main "pilot_main_$TS" --heldout
 stage "validation" python3 analysis/validate.py --trace "results/raw/pilot_validation_$TS" \
 	--threads "results/summary/pilot_main_${TS}_threads.csv" --noise "results/raw/pilot_main_$TS"
 
-[[ -n ${SUDO_USER:-} ]] && chown -R "$SUDO_USER": results build
+# Everything here ran as root: give the whole code tree (results, build, __pycache__) back.
+[[ -n ${SUDO_USER:-} ]] && chown -R "$SUDO_USER": .
 
 echo
 echo "=== PILOT SUMMARY ($TS)"

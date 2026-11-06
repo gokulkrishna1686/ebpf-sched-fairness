@@ -26,10 +26,11 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CODE = HERE.parent
 sys.path.insert(0, str(HERE))
+sys.dont_write_bytecode = True  # runs as root: don't leave root-owned __pycache__ dirs behind
 
 import baselines  # noqa: E402
 from cgroups import ExperimentCgroups, isolate_housekeeping, release_housekeeping  # noqa: E402
-from run_experiment import cpu_set, run_one  # noqa: E402
+from run_experiment import cpu_set, give_to_invoker, run_one  # noqa: E402
 
 DEFAULTS = {
     "cores": [2], "first_cpu": 1, "housekeeping_cpu": 0, "warmup_s": 5, "duration_s": 30,
@@ -121,15 +122,19 @@ def pack(batch_dir):
                    check=True)
     digest = subprocess.run(["sha256sum", tar.name], cwd=tar.parent, capture_output=True, text=True).stdout
     tar.with_name(tar.name + ".sha256").write_text(digest)
+    give_to_invoker(tar.with_name(tar.name + ".sha256"))
     if tar.stat().st_size > PART_BYTES:
         with open(tar, "rb") as f:
             k = 0
             while chunk := f.read(PART_BYTES):
-                tar.with_name(f"{tar.name}.part{k:02d}").write_bytes(chunk)
+                part = tar.with_name(f"{tar.name}.part{k:02d}")
+                part.write_bytes(chunk)
+                give_to_invoker(part)
                 k += 1
         tar.unlink()
         print(f"packed {tar.name} into {k} parts of <= 90 MB (+ .sha256 of the whole archive)")
     else:
+        give_to_invoker(tar)
         print("packed", tar)
 
 
@@ -247,6 +252,7 @@ def main():
         if cfg["isolate_housekeeping"]:
             release_housekeeping()
         (batch_dir / "index.json").write_text(json.dumps(index, indent=2) + "\n")
+        give_to_invoker(batch_dir)
         os.sched_setaffinity(0, cpu_set(0, os.cpu_count()))
 
     if args.pack:

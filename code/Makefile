@@ -52,7 +52,7 @@ $(BUILD)/schedmon.skel.h: $(BUILD)/schedmon.bpf.o
 	$(BPFTOOL) gen skeleton $< name schedmon_bpf > $@
 
 $(BUILD)/schedmon: bpf/schedmon.c bpf/schedmon.h common/sched_attr.h $(BUILD)/schedmon.skel.h
-	$(CC) $(CFLAGS) $(LIBBPF_CFLAGS) -pthread $< $(LIBBPF_LIBS) $(EXTRA_LIBS) -o $@
+	$(CC) $(CFLAGS) $(LIBBPF_CFLAGS) -pthread $< $(LIBBPF_LIBS) $(EXTRA_LIBS) -lm -o $@
 
 check-kernel:
 	@echo "kernel: $$(uname -r)"
@@ -66,7 +66,7 @@ selftest: $(BUILD)/schedmon
 
 quick: all
 	-sudo $(PYTHON) harness/run_matrix.py harness/configs/quick.json --batch-id $(QUICK_ID)
-	sudo chown -R $$(id -u):$$(id -g) results/raw/$(QUICK_ID)
+	sudo chown -R $$(id -u):$$(id -g) results
 	@test ! -f results/raw/$(QUICK_ID)/failed_runs.csv || (echo "FAILED RUNS:"; cat results/raw/$(QUICK_ID)/failed_runs.csv)
 	$(MAKE) analyze BATCH=$(QUICK_ID)
 	$(PYTHON) analysis/plots.py --main $(QUICK_ID) --out results/quick_figures/$(QUICK_ID)
@@ -77,12 +77,12 @@ pilot: all
 
 validate-trace: all
 	sudo $(PYTHON) harness/validate_trace.py
-	sudo chown -R $$(id -u):$$(id -g) results/raw
+	sudo chown -R $$(id -u):$$(id -g) results
 
 run: all
 	@test -n "$(CONFIG)" || (echo "usage: make run CONFIG=<name in harness/configs>"; exit 2)
 	sudo $(PYTHON) harness/run_matrix.py harness/configs/$(CONFIG).json --pack; \
-		status=$$?; sudo chown -R $$(id -u):$$(id -g) results/raw; exit $$status
+		status=$$?; sudo chown -R $$(id -u):$$(id -g) results; exit $$status
 
 analyze:
 	@test -n "$(BATCH)" || (echo "usage: make analyze BATCH=<batch id>"; exit 2)

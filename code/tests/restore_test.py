@@ -4,11 +4,12 @@
   sudo python3 tests/restore_test.py [--actuator nice|slice|cgweight] [--cpu 1]
 
 The test runs 2 interactive tasks and 4 batch threads on ONE CPU, so the interactive
-tasks wait. It starts schedmon with WaitBoost and a deliberately low threshold
-(theta = 100 µs) so that boosts happen, then:
-  t = 6 s   samples the interactive threads' nice / slice, or the cgroup weight; expects a boost
-  t = 8 s   stops schedmon with SIGTERM while the workload keeps running
-  t = 9 s   samples again; expects every value back at its original
+tasks wait. Then:
+  1. it reads the threads' original nice / slice and the cgroup weight BEFORE schedmon starts;
+  2. it starts schedmon with WaitBoost and a deliberately low threshold (theta = 100 µs), so
+     boosts happen, and for 5 s keeps the strongest boost it observes;
+  3. it stops schedmon with SIGTERM while the workload keeps running, and expects every value
+     back at its original.
 It also checks policy_log.csv (boost and restore rows) and schedmon_stats.json (restore_errors == 0).
 """
 import argparse
@@ -24,8 +25,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CODE = HERE.parent
 sys.path.insert(0, str(CODE / "harness"))
+sys.dont_write_bytecode = True  # runs as root: don't leave root-owned __pycache__ dirs behind
 from cgroups import ExperimentCgroups  # noqa: E402
-from run_experiment import _wait_ready  # noqa: E402
+from run_experiment import _wait_ready, give_to_invoker  # noqa: E402
 
 SYS_sched_getattr = {"x86_64": 315, "aarch64": 275}[os.uname().machine]
 
@@ -74,14 +76,9 @@ def main():
         print(f"{'PASS' if ok else 'FAIL'}  {name} {detail}")
 
     try:
-        sm = subprocess.Popen([schedmon, "--cg-interactive", str(cg.path("interactive")), "--cg-batch",
-                               str(cg.path("batch")), "--out", str(out), "--cpu", "0", "--policy", "waitboost",
-                               "--actuator", args.actuator, "--theta-us", "100", "--min-sleep", "0.3"],
-                              stdout=subprocess.PIPE, stderr=open(out / "schedmon.stderr", "w"))
-        procs.append(sm)
-        _wait_ready(sm, 30)
+        # Workload first, so the original values can be read before WaitBoost touches anything.
         start = time.monotonic_ns() + int(0.5e9)
-        common = ["--seed", "1", "--start-at", str(start), "--warmup-s", "0", "--duration-s", "12",
+        common = ["--seed", "1", "--start-at", str(start), "--warmup-s", "0", "--duration-s", "15",
                   "--out", str(out), "--iters-per-us", "500"]
         b = subprocess.Popen([wlgen, "batch", "--threads", "4", "--unit-us", "1000",
                               "--cgroup", str(cg.path("batch"))] + common)
@@ -92,10 +89,17 @@ def main():
         tids = threads_of(i.pid)
         before = {t: fair_params(t) for t in tids}
         w_before = cg.weight("interactive")
-        print(f"interactive tids {tids}; start values {before}; interactive cpu.weight {w_before}")
+        print(f"interactive tids {tids}; original values {before}; interactive cpu.weight {w_before}")
         check("interactive threads found and readable", bool(tids) and all(before.values()))
         if not results[-1]:
             raise SystemExit("cannot continue without the interactive threads")
+
+        sm = subprocess.Popen([schedmon, "--cg-interactive", str(cg.path("interactive")), "--cg-batch",
+                               str(cg.path("batch")), "--out", str(out), "--cpu", "0", "--policy", "waitboost",
+                               "--actuator", args.actuator, "--theta-us", "100", "--min-sleep", "0.3"],
+                              stdout=subprocess.PIPE, stderr=open(out / "schedmon.stderr", "w"))
+        procs.append(sm)
+        _wait_ready(sm, 30)
 
         # Levels rise and decay every few tens of ms, so sample for 5 s and keep the strongest boost seen.
         min_nice = min_slice = None
@@ -149,6 +153,7 @@ def main():
     st = json.loads((out / "schedmon_stats.json").read_text()) if (out / "schedmon_stats.json").exists() else {}
     check("restore_errors == 0", st.get("restore_errors") == 0, str(st.get("restore_errors")))
     check("actuator_errors == 0", st.get("actuator_errors") == 0, str(st.get("actuator_errors")))
+    give_to_invoker(out)
     print(f"\nrestore_test ({args.actuator}): {'ALL PASS' if all(results) else 'FAILURES ABOVE'}   files: {out}")
     sys.exit(0 if all(results) else 1)
 

@@ -59,12 +59,24 @@ def trace_waits(trace_txt, tids):
 
 def check_trace(d):
     d = Path(d)
+    if not (d / "tasks.csv").exists():
+        near = sorted(p.name for p in d.parent.glob("validation_*")) if d.parent.exists() else []
+        raise SystemExit(f"{d} is not a complete validation capture (no tasks.csv).\n"
+                         f"Use the folder name printed by 'make validate-trace' (note the dash before the time). "
+                         f"Found: {', '.join(near) or 'none'}")
     tids = set()
     for name in ("interactive_summary.json", "batch_summary.json"):
         p = d / name
         if p.exists():
             tids |= {t["tid"] for t in json.loads(p.read_text())["threads"]}
-    tw = trace_waits(d / "trace.txt", tids)
+    # ftrace prints kernel thread ids (ktid); wlgen and schedmon use namespace-local ids (tid).
+    # They differ inside containers/WSL, so translate through tasks.csv.
+    tk = pd.read_csv(d / "tasks.csv")
+    k2l = dict(zip(tk.ktid, tk.tid)) if "ktid" in tk else {}
+    l2k = {v: k for k, v in k2l.items()}
+    tw = trace_waits(d / "trace.txt", {l2k.get(t, t) for t in tids})
+    if not tw.empty:
+        tw["tid"] = tw.tid.map(lambda k: k2l.get(k, k))
     ev = pd.read_csv(d / "events.csv")
     ev = ev[ev.tid.isin(tids)].sort_values("ts_ns")
     rows = []

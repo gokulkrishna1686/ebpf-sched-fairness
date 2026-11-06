@@ -96,6 +96,25 @@ static __always_inline u32 hist_bucket(u64 wait_ns)
 	return b;
 }
 
+/*
+ * Thread id as seen from the task's own (innermost) PID namespace: what gettid() returns inside a
+ * container or a WSL distro, and what setpriority()/sched_setattr() expect there. task->pid is the
+ * id in the initial namespace, which differs in those environments.
+ */
+static __always_inline u32 task_vnr(struct task_struct *t)
+{
+	struct pid *pid = BPF_CORE_READ(t, thread_pid);
+	unsigned int level = BPF_CORE_READ(pid, level);
+	int nr = 0;
+
+	if (!pid || level > 32)
+		return BPF_CORE_READ(t, pid);
+	bpf_probe_read_kernel(&nr, sizeof(nr),
+			      (void *)pid + bpf_core_field_offset(struct pid, numbers) +
+				      level * bpf_core_type_size(struct upid) + bpf_core_field_offset(struct upid, nr));
+	return (u32)nr;
+}
+
 static __always_inline u8 task_class(struct task_struct *p)
 {
 	u64 cgid = BPF_CORE_READ(p, cgroups, dfl_cgrp, kn, id);
@@ -127,8 +146,9 @@ static __always_inline struct task_stats *get_stats(struct task_struct *p)
 		return NULL;
 	__builtin_memset(init, 0, sizeof(*init));
 	init->start_ns = start;
-	init->tid = tid;
-	init->tgid = BPF_CORE_READ(p, tgid);
+	init->ktid = tid;
+	init->tid = task_vnr(p);
+	init->tgid = task_vnr(BPF_CORE_READ(p, group_leader));
 	init->cls = cls;
 	bpf_probe_read_kernel_str(init->comm, sizeof(init->comm), p->comm);
 	bpf_map_update_elem(&tasks, &tid, init, BPF_ANY);

@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <math.h>
 #include <pthread.h>
 #include <sched.h>
 #include <signal.h>
@@ -556,7 +557,7 @@ static void dump_task(const struct task_stats *st, void *arg)
 	for (char *c = comm; *c; c++)
 		if (*c == ',' || *c == '"' || *c == '\n')
 			*c = '_';
-	fprintf(f, "%u,%u,%s,%u,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu", st->tid, st->tgid, comm, st->cls,
+	fprintf(f, "%u,%u,%u,%s,%u,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu", st->tid, st->ktid, st->tgid, comm, st->cls,
 		(unsigned long long)st->n_wakeups, (unsigned long long)st->n_wait,
 		(unsigned long long)st->wait_sum_ns, (unsigned long long)st->wait_max_ns,
 		(unsigned long long)st->run_ns, (unsigned long long)st->nvcsw, (unsigned long long)st->nivcsw,
@@ -576,7 +577,7 @@ static void write_tasks_csv(int fd)
 {
 	FILE *f = open_out("tasks.csv");
 
-	fprintf(f, "tid,tgid,comm,class,n_wakeups,n_wait,wait_sum_ns,wait_max_ns,run_ns,nvcsw,nivcsw,migrations");
+	fprintf(f, "tid,ktid,tgid,comm,class,n_wakeups,n_wait,wait_sum_ns,wait_max_ns,run_ns,nvcsw,nivcsw,migrations");
 	for (int i = 0; i < HIST_BUCKETS; i++)
 		fprintf(f, ",h%02d", i);
 	fputc('\n', f);
@@ -643,6 +644,7 @@ static void write_stats_json(struct schedmon_bpf *skel, __u64 t_start, __u64 t_e
 /* ---------------------------------------------------------------- selftest */
 
 static volatile int spin_stop;
+static __u64 spin_delay_at_exit; /* the spinner's own schedstat run_delay, read just before it exits */
 
 static void pin_to(int cpu)
 {
@@ -651,16 +653,6 @@ static void pin_to(int cpu)
 	CPU_ZERO(&set);
 	CPU_SET(cpu, &set);
 	sched_setaffinity(0, sizeof(set), &set);
-}
-
-static void *spinner(void *arg)
-{
-	volatile __u64 x = 0;
-
-	pin_to(*(int *)arg);
-	while (!spin_stop)
-		x++;
-	return NULL;
 }
 
 static __u64 schedstat_run_delay(pid_t tid)
@@ -679,40 +671,68 @@ static __u64 schedstat_run_delay(pid_t tid)
 	return delay;
 }
 
-struct st_ctx {
-	pid_t main_tid, spin_tid;
-	__u64 main_delay0;
-	int found;
-};
-
-static void selftest_task(const struct task_stats *st, void *arg)
+static void *spinner(void *arg)
 {
-	struct st_ctx *c = arg;
-	__u64 ref;
+	volatile __u64 x = 0;
 
-	if ((pid_t)st->tid != c->main_tid && (pid_t)st->tid != c->spin_tid)
-		return;
-	ref = schedstat_run_delay((pid_t)st->tid);
-	if ((pid_t)st->tid == c->main_tid)
-		ref -= c->main_delay0;
-	printf("  tid %-7u %-8s wakeups=%-5llu waits=%-5llu mean_wait=%7.1fus max_wait=%7.1fus run=%7.1fms "
-	       "vcsw=%llu ivcsw=%llu | schedstat run_delay=%7.1fms ebpf=%7.1fms\n",
-	       st->tid, (pid_t)st->tid == c->main_tid ? "sleeper" : "spinner", (unsigned long long)st->n_wakeups,
-	       (unsigned long long)st->n_wait, st->n_wait ? (double)st->wait_sum_ns / st->n_wait / 1e3 : 0.0,
-	       st->wait_max_ns / 1e3, st->run_ns / 1e6, (unsigned long long)st->nvcsw,
-	       (unsigned long long)st->nivcsw, ref / 1e6, st->wait_sum_ns / 1e6);
-	if (st->n_wait > 0)
-		c->found++;
+	pin_to(*(int *)arg);
+	while (!spin_stop)
+		x++;
+	spin_delay_at_exit = schedstat_run_delay(gettid());
+	return NULL;
+}
+
+/* Stats entry of a thread by its namespace-local tid (the map is keyed by kernel tid). */
+static bool find_task(int fd, pid_t tid, struct task_stats *out)
+{
+	__u32 key, next, *prev = NULL;
+
+	while (bpf_map_get_next_key(fd, prev, &next) == 0) {
+		if (bpf_map_lookup_elem(fd, &next, out) == 0 && (pid_t)out->tid == tid)
+			return true;
+		key = next;
+		prev = &key;
+	}
+	memset(out, 0, sizeof(*out));
+	return false;
+}
+
+/*
+ * schedstat stamps a wait's start and end at scheduler entry (rq_clock, updated at the top of
+ * __schedule); schedmon stamps them at the sched_switch tracepoint, after the next task has been
+ * picked. Call that gap delta. A wait that ENDS with a switch-in (the sleeper after a wake-up) is
+ * longer in eBPF by delta; a wait that STARTS with a switch-out (the preempted spinner) is shorter
+ * by delta. So both rows must imply the same small positive per-wait offset. Exact per-wait
+ * agreement with the same tracepoints is checked against raw ftrace in T4.
+ */
+#define DELTA_MIN_US (-2.0)
+#define DELTA_MAX_US 50.0
+
+static bool print_row(const char *name, const struct task_stats *st, __u64 waits, __u64 ebpf_ns, __u64 ref_ns,
+		      int sign)
+{
+	double delta_us = waits ? sign * ((double)ebpf_ns - (double)ref_ns) / (double)waits / 1e3 : 0.0;
+	bool ok = waits && delta_us >= DELTA_MIN_US && delta_us <= DELTA_MAX_US;
+
+	printf("  tid %-7u %-8s wakeups=%-5llu waits=%-5llu mean_wait=%7.1fus max_wait=%7.1fus | "
+	       "eBPF %.2f ms vs schedstat %.2f ms -> offset %.1f us/wait %s\n",
+	       st->tid, name, (unsigned long long)st->n_wakeups, (unsigned long long)waits,
+	       waits ? (double)ebpf_ns / (double)waits / 1e3 : 0.0, st->wait_max_ns / 1e3, ebpf_ns / 1e6,
+	       ref_ns / 1e6, delta_us, ok ? "OK" : "MISMATCH");
+	return ok;
 }
 
 static int selftest(struct schedmon_bpf *skel)
 {
 	char line[4096], path[4200];
-	struct st_ctx c = { 0 };
+	struct task_stats base, st;
 	struct ring_buffer *rb;
+	__u64 delay0, ebpf, ref, waits;
+	pid_t main_tid, spin_tid = -1;
+	bool waits_seen = true, all_ok = true;
 	pthread_t th;
 	FILE *f;
-	int cpu = sched_getcpu();
+	int cpu = sched_getcpu(), tasks_fd = bpf_map__fd(skel->maps.tasks);
 
 	/* Track our own cgroup. */
 	f = fopen("/proc/self/cgroup", "r");
@@ -736,8 +756,11 @@ static int selftest(struct schedmon_bpf *skel)
 	rb = ring_buffer__new(bpf_map__fd(skel->maps.events), on_event, NULL, NULL);
 
 	pin_to(cpu);
-	c.main_tid = gettid();
-	c.main_delay0 = schedstat_run_delay(c.main_tid);
+	main_tid = gettid();
+	usleep(20000); /* let the move to `cpu` finish before taking the baselines */
+	/* Baselines of both sources at the same instant, so they cover the same window. */
+	delay0 = schedstat_run_delay(main_tid);
+	find_task(tasks_fd, main_tid, &base);
 	pthread_create(&th, NULL, spinner, &cpu);
 	usleep(20000);
 	for (int i = 0; i < 200; i++) {
@@ -747,6 +770,7 @@ static int selftest(struct schedmon_bpf *skel)
 	}
 	spin_stop = 1;
 	pthread_join(th, NULL);
+	ref = schedstat_run_delay(main_tid) - delay0;
 	if (rb)
 		ring_buffer__consume(rb);
 
@@ -754,26 +778,44 @@ static int selftest(struct schedmon_bpf *skel)
 	printf("  events emitted=%llu dropped=%llu\n",
 	       (unsigned long long)percpu_sum(bpf_map__fd(skel->maps.stats), STAT_EMITTED),
 	       (unsigned long long)percpu_sum(bpf_map__fd(skel->maps.stats), STAT_DROPPED));
-	c.spin_tid = -1;
-	{
-		/* any tracked tid in our tgid that is not the main thread is the (exited) spinner */
-		__u32 key, next, *prev = NULL;
-		struct task_stats st;
-		int fd = bpf_map__fd(skel->maps.tasks);
 
-		while (bpf_map_get_next_key(fd, prev, &next) == 0) {
-			if (!bpf_map_lookup_elem(fd, &next, &st) && st.tgid == (__u32)getpid() &&
-			    (pid_t)st.tid != c.main_tid)
-				c.spin_tid = (pid_t)st.tid;
+	/* Sleeper (main thread): deltas over [baseline, end]. */
+	find_task(tasks_fd, main_tid, &st);
+	ebpf = st.wait_sum_ns - base.wait_sum_ns;
+	waits = st.n_wait - base.n_wait;
+	all_ok &= print_row("sleeper", &st, waits, ebpf, ref, +1); /* waits end at switch-in */
+	waits_seen &= waits >= 150;
+
+	/* Spinner: whole life, against the run_delay it read itself just before exiting. */
+	{
+		__u32 key, next, *prev = NULL;
+
+		while (bpf_map_get_next_key(tasks_fd, prev, &next) == 0) {
+			if (!bpf_map_lookup_elem(tasks_fd, &next, &st) && st.tgid == (__u32)getpid() &&
+			    (pid_t)st.tid != main_tid)
+				spin_tid = (pid_t)st.tid;
 			key = next;
 			prev = &key;
 		}
 	}
-	for_each_task(bpf_map__fd(skel->maps.tasks), selftest_task, &c);
-	printf("  (spinner schedstat reads 0 after it exits; compare the sleeper row)\n");
+	if (spin_tid > 0 && find_task(tasks_fd, spin_tid, &st)) {
+		/* waits start at switch-out (preemption) */
+		all_ok &= print_row("spinner", &st, st.n_wait, st.wait_sum_ns, spin_delay_at_exit, -1);
+		waits_seen &= st.n_wait >= 150;
+	} else {
+		printf("  spinner not found in the map\n");
+		waits_seen = false;
+	}
 	ring_buffer__free(rb);
-	printf("selftest %s\n", c.found ? "PASS" : "FAIL (no waits recorded)");
-	return c.found ? 0 : 1;
+
+	if (!waits_seen)
+		printf("selftest FAIL (too few waits recorded)\n");
+	else if (!all_ok)
+		printf("selftest FAIL (eBPF vs schedstat offset outside %.0f..%.0f us per wait)\n", DELTA_MIN_US,
+		       DELTA_MAX_US);
+	else
+		printf("selftest PASS\n");
+	return waits_seen && all_ok ? 0 : 1;
 }
 
 /* ---------------------------------------------------------------- main */

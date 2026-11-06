@@ -23,6 +23,30 @@ class RunFailed(Exception):
     pass
 
 
+RESULTS = Path(__file__).resolve().parents[1] / "results"
+
+
+def give_to_invoker(path):
+    """Under sudo, hand `path` (recursively) and its parents up to results/ back to the invoking
+    user, so the analysis can run unprivileged afterwards."""
+    uid, gid = os.environ.get("SUDO_UID"), os.environ.get("SUDO_GID")
+    if os.geteuid() != 0 or uid is None or gid is None:
+        return
+    uid, gid, path = int(uid), int(gid), Path(path)
+    targets = [path, *path.rglob("*")] if path.is_dir() else [path]
+    parent = path.parent
+    while RESULTS == parent or RESULTS in parent.parents:
+        targets.append(parent)
+        if parent == RESULTS:
+            break
+        parent = parent.parent
+    for p in targets:
+        try:
+            os.chown(p, uid, gid, follow_symlinks=False)
+        except OSError:
+            pass
+
+
 def cpu_range(first, n):
     return str(first) if n == 1 else f"{first}-{first + n - 1}"
 
