@@ -276,7 +276,7 @@ def fig_theta(paired, out, frozen_theta, prefix="wbs-t", cont="x2"):
 def fig_validation(threads, out):
     if threads is None or threads.empty or "role" not in threads:
         return  # no schedstat on this kernel: nothing to compare against
-    fig, ax = plt.subplots(figsize=(style.COL_W, 2.2))
+    fig, ax = plt.subplots(figsize=(style.COL_W, 1.75))
     for k, (role, g) in enumerate(threads.groupby("role")):
         ax.plot(g.schedstat_delay_ns / 1e6, g.ebpf_wait_ns / 1e6, ls="none", marker=style.MARKERS[k], ms=3,
                 color=style.SLOTS[k], alpha=0.7, mec="none", label={"inter": "interactive", "batch": "batch"}[role])
@@ -288,9 +288,9 @@ def fig_validation(threads, out):
         a.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:g}"))
         a.set_minor_formatter(matplotlib.ticker.NullFormatter())
     ax.set_xlabel("kernel schedstat run_delay (ms)")
-    ax.set_ylabel("eBPF total run-queue wait (ms)")
+    ax.set_ylabel("eBPF total wait (ms)")
     err = (threads.ebpf_wait_ns.sum() - threads.schedstat_delay_ns.sum()) / threads.schedstat_delay_ns.sum()
-    ax.set_title(f"Per-thread validation, n={len(threads)}, aggregate error {err:+.2%}")
+    print(f"  validation: n={len(threads)} threads, aggregate error {err:+.2%}")  # for the caption
     ax.legend(loc="upper left")
     save(fig, out, "validation")
 
@@ -372,6 +372,7 @@ def main():
             if (R / args.main).exists():
                 fig_cdf(R / args.main, mix, O)
         fig_pareto(paired, O, "pareto_main")
+        fig_pareto(paired, O, "pareto_x4", conts=("x4",))  # one-row version for the 6-page paper
         if cells is not None:
             loaded = [c for c in ("x4", "x2", "x1") if (cells.contention == c).any()]
             for mix in sorted(cells.mix.unique()):

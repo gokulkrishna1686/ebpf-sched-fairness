@@ -3,16 +3,16 @@
 \footnotesize
 \caption{Experimental platform (from sysinfo.json).}
 \label{tab:repro}
-\begin{tabular}{@{}lp{0.68\columnwidth}@{}}
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{0.72\columnwidth}@{}}
 \toprule
 Distribution & Ubuntu 26.04.1 LTS \\
 Kernel & 6.18.54.1-microsoft-standard-WSL2 \\
 Virtualization & wsl (clocksource tsc) \\
 CPU & 11th Gen Intel(R) Core(TM) i5-1155G7 @ 2.50GHz (8 vCPU) \\
 Memory & 7.6 GiB \\
-Storage & /dev/sdd       ext4 1007G  2.9G  953G   1% / \\
-Kernel config & HZ=250, PREEMPT\\_DYNAMIC=y, SCHED\\_CLASS\\_EXT=n \\
-Scheduler & EEVDF, base slice 2800000 ns, preempt=(none) voluntary full lazy \\
+Storage & ext4, 1007G \\
+Kernel config & HZ=250, PREEMPT\_DYNAMIC=y, SCHED\_CLASS\_EXT=n \\
+Scheduler & EEVDF, base slice 2.8 ms, preemption mode none \\
 Compilers & gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0; Ubuntu clang version 21.1.8 (6ubuntu1) \\
 BPF tooling & libbpf 1.6.3; bpftool v7.7.0; bpftrace v0.25.0 \\
 Analysis & Python 3.14.4, numpy 2.3.5, pandas 2.3.3, scipy 1.16.3 \\

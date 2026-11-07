@@ -1,0 +1,28 @@
+\begin{table*}[t]
+\centering
+\footnotesize
+\caption{Every policy in every cell, relative to B0 (median of 5 seed pairs; All: the 45 main pairs pooled). \textbf{Bold}: the whole 95\% bootstrap CI is better than B0; {\normalfont\itshape italic}: the whole CI is worse. x$k$: $k$ batch threads per core.}
+\label{tab:matrix}
+\setlength{\tabcolsep}{4.2pt}
+\begin{tabular}{@{}lrrrrrrrrrrrrr@{}}
+\toprule
+Policy & \multicolumn{3}{c}{M1} & \multicolumn{3}{c}{M2} & \multicolumn{3}{c}{M3} & \multicolumn{1}{c}{All} & \multicolumn{3}{c}{M4 (held out)} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}\cmidrule(lr){12-14}
+ & x1 & x2 & x4 & x1 & x2 & x4 & x1 & x2 & x4 & pairs & x1 & x2 & x4 \\
+\midrule
+B0 p99 (ms) & 6.0 & 6.4 & 5.7 & 4.3 & 4.3 & 4.3 & 8.7 & 10.3 & 11.9 &  & 25.3 & 28.5 & 27.2 \\
+\addlinespace[2pt]\multicolumn{14}{@{}l}{\textit{Interactive p99 / B0}} \\
+B1 nice & 0.93 & 0.97 & 0.98 & 0.99 & 1.02 & \textit{1.04} & 1.27 & 0.85 & 1.07 & 1.01 & 0.86 & 1.01 & \textit{1.20} \\
+B2 cg-weight & \textbf{0.63} & \textbf{0.78} & \textbf{0.51} & \textbf{0.53} & \textbf{0.54} & \textbf{0.51} & \textbf{0.67} & \textbf{0.59} & \textbf{0.50} & \textbf{0.58} & \textbf{0.61} & \textbf{0.58} & \textbf{0.54} \\
+B3 slice & 1.01 & 0.99 & 1.13 & 1.07 & 1.08 & 1.14 & 1.09 & 0.86 & \textit{1.30} & \textit{1.08} & 1.11 & 1.06 & 1.22 \\
+WB-nice & 1.01 & \textit{1.14} & 1.11 & 0.99 & 0.99 & 0.99 & 1.05 & 1.03 & \textit{2.17} & \textit{1.03} & 1.17 & \textit{1.12} & \textit{1.51} \\
+WB-slice & 1.02 & 1.01 & 1.02 & 0.95 & 0.98 & 1.05 & 0.91 & 1.09 & 1.38 & 1.01 & 1.05 & 1.07 & 1.01 \\
+\addlinespace[2pt]\multicolumn{14}{@{}l}{\textit{Batch throughput / B0}} \\
+B1 nice & 1.02 & 1.00 & 1.00 & 1.01 & 1.00 & 0.99 & 1.01 & 1.01 & 1.01 & 1.00 & 1.01 & 0.99 & 0.99 \\
+B2 cg-weight & 0.99 & 1.00 & 1.00 & 1.00 & 1.00 & 0.99 & 1.00 & 0.99 & 0.98 & 1.00 & 1.01 & \textit{0.98} & 0.99 \\
+B3 slice & 1.00 & 1.01 & 1.01 & 1.01 & 1.01 & 1.00 & 0.99 & 1.00 & 1.01 & 1.01 & \textbf{1.02} & 1.00 & 1.01 \\
+WB-nice & 0.98 & \textit{0.93} & 1.00 & 1.00 & 1.02 & 1.00 & 1.01 & 1.00 & 0.99 & 1.00 & 1.02 & 1.00 & 0.99 \\
+WB-slice & 0.99 & 1.00 & 1.00 & 1.04 & 1.02 & 1.00 & 1.02 & 1.01 & 1.00 & 1.00 & 1.00 & 0.99 & \textit{0.98} \\
+\bottomrule
+\end{tabular}
+\end{table*}

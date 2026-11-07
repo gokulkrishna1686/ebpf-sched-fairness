@@ -1,0 +1,139 @@
+% Peer-reviewed related work (12). Venues and DOIs to be re-checked on Google Scholar / dblp before submission.
+
+@inproceedings{leverich2014reconciling,
+  author    = {Jacob Leverich and Christos Kozyrakis},
+  title     = {Reconciling High Server Utilization and Sub-millisecond Quality-of-Service},
+  booktitle = {Proc. EuroSys},
+  year      = {2014},
+  publisher = {ACM},
+  doi       = {10.1145/2592798.2592821}
+}
+
+@inproceedings{duda1999bvt,
+  author    = {Kenneth J. Duda and David R. Cheriton},
+  title     = {Borrowed-Virtual-Time ({BVT}) Scheduling: Supporting Latency-Sensitive Threads in a General-Purpose Scheduler},
+  booktitle = {Proc. ACM SOSP},
+  year      = {1999},
+  pages     = {261--276},
+  doi       = {10.1145/319151.319169}
+}
+
+@inproceedings{lo2015heracles,
+  author    = {David Lo and Liqun Cheng and Rama Govindaraju and Parthasarathy Ranganathan and Christos Kozyrakis},
+  title     = {Heracles: Improving Resource Efficiency at Scale},
+  booktitle = {Proc. ACM/IEEE ISCA},
+  year      = {2015},
+  pages     = {450--462},
+  doi       = {10.1145/2749469.2749475}
+}
+
+@inproceedings{humphries2021ghost,
+  author    = {Jack Tigar Humphries and others},
+  title     = {{ghOSt}: Fast \& Flexible User-Space Delegation of {Linux} Scheduling},
+  booktitle = {Proc. ACM SOSP},
+  year      = {2021},
+  pages     = {588--604},
+  doi       = {10.1145/3477132.3483542}
+}
+
+@inproceedings{li2014tales,
+  author    = {Jialin Li and Naveen Kr. Sharma and Dan R. K. Ports and Steven D. Gribble},
+  title     = {Tales of the Tail: Hardware, {OS}, and Application-level Sources of Tail Latency},
+  booktitle = {Proc. ACM SoCC},
+  year      = {2014},
+  doi       = {10.1145/2670979.2670988}
+}
+
+@inproceedings{lozi2016wasted,
+  author    = {Jean-Pierre Lozi and Baptiste Lepers and Justin Funston and Fabien Gaud and Vivien Qu{\'e}ma and Alexandra Fedorova},
+  title     = {The {Linux} Scheduler: A Decade of Wasted Cores},
+  booktitle = {Proc. EuroSys},
+  year      = {2016},
+  doi       = {10.1145/2901318.2901326}
+}
+
+@inproceedings{bouron2018battle,
+  author    = {Justinien Bouron and others},
+  title     = {The Battle of the Schedulers: {FreeBSD} {ULE} vs. {Linux} {CFS}},
+  booktitle = {Proc. USENIX ATC},
+  year      = {2018},
+  pages     = {85--96}
+}
+
+@inproceedings{stoica1996eevdf,
+  author    = {Ion Stoica and Hussein Abdel-Wahab and Kevin Jeffay and Sanjoy K. Baruah and Johannes E. Gehrke and C. Greg Plaxton},
+  title     = {A Proportional Share Resource Allocation Algorithm for Real-Time, Time-Shared Systems},
+  booktitle = {Proc. IEEE RTSS},
+  year      = {1996},
+  pages     = {288--299},
+  doi       = {10.1109/REAL.1996.563725}
+}
+
+@inproceedings{chen2019parties,
+  author    = {Shuang Chen and Christina Delimitrou and Jos{\'e} F. Mart{\'i}nez},
+  title     = {{PARTIES}: {QoS}-Aware Resource Partitioning for Multiple Interactive Services},
+  booktitle = {Proc. ACM ASPLOS},
+  year      = {2019},
+  pages     = {107--120},
+  doi       = {10.1145/3297858.3304005}
+}
+
+@inproceedings{fried2020caladan,
+  author    = {Joshua Fried and Zhenyuan Ruan and Amy Ousterhout and Adam Belay},
+  title     = {Caladan: Mitigating Interference at Microsecond Timescales},
+  booktitle = {Proc. USENIX OSDI},
+  year      = {2020},
+  pages     = {281--297}
+}
+
+@inproceedings{miller2024enoki,
+  author    = {Samantha Miller and Anirudh Kumar and Tanay Vakharia and Ang Chen and Danyang Zhuo and Thomas Anderson},
+  title     = {Enoki: High Velocity {Linux} Kernel Scheduler Development},
+  booktitle = {Proc. EuroSys},
+  year      = {2024},
+  doi       = {10.1145/3627703.3629569}
+}
+
+@inproceedings{jia2024skyloft,
+  author    = {Yuekai Jia and Kaifu Tian and Yuyang You and Yu Chen and Kang Chen},
+  title     = {Skyloft: A General High-Efficient Scheduling Framework in User Space},
+  booktitle = {Proc. ACM SOSP},
+  year      = {2024},
+  doi       = {10.1145/3694715.3695973}
+}
+
+% Definitions, methods and documentation (not counted as related work).
+
+@techreport{jain1984fairness,
+  author      = {Raj Jain and Dah-Ming Chiu and William R. Hawe},
+  title       = {A Quantitative Measure of Fairness and Discrimination for Resource Allocation in Shared Computer Systems},
+  institution = {Digital Equipment Corporation},
+  number      = {DEC-TR-301},
+  year        = {1984}
+}
+
+@book{efron1993bootstrap,
+  author    = {Bradley Efron and Robert J. Tibshirani},
+  title     = {An Introduction to the Bootstrap},
+  publisher = {Chapman \& Hall},
+  year      = {1993}
+}
+
+@misc{kernel-eevdf,
+  author       = {{The Linux Kernel Documentation}},
+  title        = {{EEVDF} Scheduler},
+  howpublished = {\url{https://docs.kernel.org/scheduler/sched-eevdf.html}},
+}
+
+@misc{kernel-cgroupv2,
+  author       = {{The Linux Kernel Documentation}},
+  title        = {Control Group v2},
+  howpublished = {\url{https://docs.kernel.org/admin-guide/cgroup-v2.html}},
+}
+
+@misc{corbet2024eevdf,
+  author       = {Jonathan Corbet},
+  title        = {Completing the {EEVDF} Scheduler},
+  howpublished = {LWN.net, \url{https://lwn.net/Articles/969062/}},
+  year         = {2024}
+}

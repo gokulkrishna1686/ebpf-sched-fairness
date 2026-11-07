@@ -1,21 +1,19 @@
 \begin{table}[t]
 \centering
 \footnotesize
-\caption{Instrumentation overhead (median over seeds; ratios vs.\ no collector).}
+\caption{Instrumentation overhead. Ratios are paired by seed with runs without the collector (median [95\% CI]); the maximum ring-buffer drop rate was 0.000\%.}
 \label{tab:overhead}
-\begin{tabular}{llrrrrr}
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}llrrrr@{}}
 \toprule
-Cont. & Collector & ns/event & BPF CPU (\%) & Drops (\%) & Tput ratio & p99 ratio \\
+& Collector & ns/ev. & CPU\,\% & Tput ratio & p99 ratio \\
 \midrule
-x1 & no collector & -- & -- & -- & 1.000 & 1.00 \\
- & maps only & 514 & 0.025 & 0.000 & 0.979 & 0.97 \\
- & maps + events & 598 & 0.029 & 0.000 & 0.993 & 0.97 \\
-x2 & no collector & -- & -- & -- & 1.000 & 1.00 \\
- & maps only & 490 & 0.031 & 0.000 & 1.001 & 1.13 \\
- & maps + events & 565 & 0.035 & 0.000 & 0.997 & 1.11 \\
-x4 & no collector & -- & -- & -- & 1.000 & 1.00 \\
- & maps only & 485 & 0.031 & 0.000 & 0.995 & 0.99 \\
- & maps + events & 551 & 0.036 & 0.000 & 1.002 & 1.42 \\
+x1 & maps only & 514 & 0.025 & 0.99 {\scriptsize[0.96, 1.04]} & 1.03 {\scriptsize[0.85, 1.07]} \\
+ & maps + events & 598 & 0.029 & 0.99 {\scriptsize[0.92, 1.02]} & 0.96 {\scriptsize[0.94, 1.19]} \\
+x2 & maps only & 490 & 0.031 & 0.99 {\scriptsize[0.65, 1.01]} & 1.10 {\scriptsize[0.97, 1.61]} \\
+ & maps + events & 565 & 0.035 & 0.99 {\scriptsize[0.98, 1.00]} & 1.09 {\scriptsize[1.02, 1.15]} \\
+x4 & maps only & 485 & 0.031 & 0.99 {\scriptsize[0.63, 1.00]} & 1.01 {\scriptsize[0.96, 1.88]} \\
+ & maps + events & 551 & 0.036 & 1.00 {\scriptsize[0.67, 1.00]} & 1.35 {\scriptsize[0.95, 1.77]} \\
 \bottomrule
 \end{tabular}
 \end{table}

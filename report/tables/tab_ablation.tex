@@ -1,0 +1,20 @@
+\begin{table}[t]
+\centering
+\footnotesize
+\caption{Ablations at 2 batch threads per core, pooled over M1--M3 (15 seed pairs per row; marks as in Table~\ref{tab:matrix}). Boosts: median boost actions per run.}
+\label{tab:ablation}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Variant & p99/B0 [95\% CI] & Tput & Max wait & Boosts \\
+\midrule
+WB-nice & \textit{1.04} {\scriptsize[1.01, 1.07]} & 1.00 & 1.00 & 73 \\
+\quad no aging & 1.01 {\scriptsize[0.99, 1.05]} & 1.00 & 0.95 & 20 \\
+\quad no wait feedback & 1.00 {\scriptsize[0.96, 1.08]} & 1.00 & 1.00 & 5 \\
+WB-slice & \textit{1.03} {\scriptsize[1.01, 1.06]} & \textbf{1.01} & 0.96 & 83 \\
+\quad no aging & 1.03 {\scriptsize[0.97, 1.07]} & 1.00 & 0.98 & 20 \\
+\quad no wait feedback & 1.04 {\scriptsize[0.98, 1.09]} & 1.00 & \textbf{0.87} & 5 \\
+WB-cg (per class) & \textbf{0.86} {\scriptsize[0.69, 0.92]} & 1.00 & 0.93 & 243 \\
+\bottomrule
+\end{tabular}
+\end{table}
