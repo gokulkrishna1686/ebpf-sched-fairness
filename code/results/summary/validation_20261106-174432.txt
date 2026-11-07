@@ -1,0 +1,9 @@
+trace waits: 706, matched to eBPF: 706 (100.0%)
+|diff| median 0.12 µs, p99 2.10 µs, max 18.18 µs
+wrote results/raw/validation_20261106-174432/validation_waits.csv and results/raw/validation_20261106-174432/validation_hand.md
+trace validation: PASS (need >= 95% matched, median <= 5 µs, p99 <= 20 µs)
+batch  threads= 1260 aggregate err=-0.015% per-thread |err| median=0.008% p95=0.222%
+inter  threads= 1330 aggregate err=-0.182% per-thread |err| median=0.792% p95=49.612%
+noise floor (2028 idle wake-ups): wake-up lag p50 253.7 µs, p99 479.5 µs, p99.9 542.5 µs, max 600.0 µs
+run-queue wait of the idle task: p99 66.2 µs, max 302.2 µs
+verdict: OK

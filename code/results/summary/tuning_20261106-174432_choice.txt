@@ -1,0 +1,16 @@
+Median over (mix, seed) pairs, ratios vs B0:
+actuator  theta_us  p99_ratio  tput_ratio  pairs  p99_M1  p99_M2
+    nice       250      0.946       1.041      6   0.933   0.968
+    nice       500      0.907       1.074      6   0.874   0.934
+    nice      1000      0.907       1.041      6   0.882   0.954
+    nice      2000      0.907       1.030      6   0.868   0.951
+   slice       250      0.918       1.035      6   0.834   0.939
+   slice       500      0.893       1.047      6   0.830   0.955
+   slice      1000      0.909       1.033      6   0.876   0.922
+   slice      2000      0.900       1.028      6   0.860   1.022
+
+nice: θ = 2000 µs  (p99 ratio 0.907, throughput ratio 1.030, 6 pairs) — rule applied
+
+slice: θ = 2000 µs  (p99 ratio 0.900, throughput ratio 1.028, 6 pairs) — rule applied
+
+frozen parameters written to /home/asish_preetam/fairexp/code/harness/configs/params_frozen.json: {"nice": {"theta_us": 2000}, "slice": {"theta_us": 2000}}
