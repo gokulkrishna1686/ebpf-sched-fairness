@@ -5,6 +5,8 @@
 
 Checks:
   every run         status ok, restore_check ok, schedmon exit 0
+  interruptions     no run took more than 3x the batch's typical wall time (host sleep/standby
+                    pauses the VM mid-run and corrupts its timings): delete such runs and resume
   collector         no dropped events, no actuator or restore errors
   workload          no thread setup errors, first requests not late
   baselines         B1 batch threads really at nice 10, B3 interactive slice really applied
@@ -14,6 +16,7 @@ Checks:
 import json
 import sys
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "harness"))
@@ -47,6 +50,18 @@ def main():
     if cfg.get("pilot"):
         print("NOTE  pilot batch (4 s runs, 2 seeds): checks the pipeline only; never use its numbers")
 
+    # Wall time of each run: from its start ("created") to meta.json being written at its end.
+    wall = {}
+    for d in runs:
+        meta = load(d / "meta.json") or {}
+        try:
+            start = datetime.strptime(meta["created"], "%Y-%m-%dT%H:%M:%S%z").timestamp()
+            wall[d.name] = (d / "meta.json").stat().st_mtime - start
+        except (KeyError, ValueError):
+            pass
+    typical = sorted(wall.values())[len(wall) // 2] if wall else None
+    interrupted = []
+
     hashes = defaultdict(set)
     for d in runs:
         meta = load(d / "meta.json") or {}
@@ -54,6 +69,10 @@ def main():
         if meta.get("status") != "ok":
             report("FAIL", f"{rid}: status {meta.get('status')}")
             continue
+        if typical and wall.get(rid, 0) > 3 * typical:
+            interrupted.append(rid)
+            report("FAIL", f"{rid}: took {wall[rid] / 60:.1f} min instead of ~{typical:.0f} s "
+                           "(host paused it, e.g. sleep/standby): its timings are not valid")
         if not (meta.get("restore_check") or {}).get("ok"):
             report("FAIL", f"{rid}: restore_check {meta.get('restore_check')}")
         if meta.get("schedmon_rc") not in (None, 0):
@@ -103,6 +122,12 @@ def main():
         else:
             print("PASS  noise_floor present (summarize with: python3 analysis/validate.py --noise <batch>)")
 
+    if interrupted:
+        print("\nTo re-run the interrupted runs (the decision uses wall time only, never their results):")
+        print("  rm -rf " + " ".join(f"{batch}/{r}" for r in interrupted))
+        print(f"  then resume the batch (golden run: make golden TS=<timestamp>; otherwise "
+              f"sudo python3 harness/run_matrix.py <config> --resume {batch} --pack)")
+        print("  and record them in the paper as runs re-run after a host interruption")
     print(f"\n{batch.name}: {counts['FAIL']} FAIL, {counts['WARN']} WARN")
     sys.exit(1 if counts["FAIL"] else 0)
 
