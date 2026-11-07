@@ -1,0 +1,56 @@
+\begin{table*}[t]
+\centering
+\footnotesize
+\caption{Main results: median over 5 paired seeds with 95\% bootstrap CI; ratios are paired with B0.}
+\label{tab:main}
+\begin{tabular}{llrrrrrr}
+\toprule
+Mix & Policy & p99 (ms) [95\% CI] & p99/B0 & SLO miss (\%) & Batch tput/B0 & Jain (norm.) & Batch max wait (ms) \\
+\midrule
+\multicolumn{8}{l}{\textit{Contention x2 (2 batch threads per core)}} \\
+M1 & B0 default & 6.4 {\scriptsize[6.1, 7.1]} & 1.00 & 2.9 & 1.00 & 1.000 & 24.2 \\
+ & B1 nice & 6.5 {\scriptsize[6.3, 7.2]} & 0.97 & 2.9 & 1.003 & 1.000 & 24.0 \\
+ & B2 cg-weight & 4.8 {\scriptsize[4.7, 6.4]} & 0.78 & 0.9 & 1.003 & 1.000 & 24.0 \\
+ & B3 slice & 6.2 {\scriptsize[6.0, 6.7]} & 0.99 & 10.0 & 1.008 & 0.999 & 22.4 \\
+ & WB-nice & 7.8 {\scriptsize[6.5, 24.0]} & 1.14 & 4.1 & 0.932 & 0.999 & 25.2 \\
+ & WB-slice & 6.8 {\scriptsize[6.0, 7.2]} & 1.01 & 3.4 & 1.004 & 0.999 & 22.0 \\
+\addlinespace[2pt]
+M2 & B0 default & 4.3 {\scriptsize[4.2, 4.9]} & 1.00 & 4.6 & 1.00 & 1.000 & 20.8 \\
+ & B1 nice & 4.3 {\scriptsize[4.2, 4.8]} & 1.02 & 4.6 & 0.997 & 1.000 & 20.2 \\
+ & B2 cg-weight & 2.3 {\scriptsize[2.2, 2.8]} & 0.54 & 0.9 & 1.002 & 1.000 & 20.5 \\
+ & B3 slice & 4.6 {\scriptsize[4.6, 4.7]} & 1.08 & 5.1 & 1.008 & 1.000 & 20.3 \\
+ & WB-nice & 4.3 {\scriptsize[4.1, 4.8]} & 0.99 & 4.6 & 1.023 & 1.000 & 23.5 \\
+ & WB-slice & 4.3 {\scriptsize[4.1, 4.6]} & 0.98 & 4.4 & 1.018 & 1.000 & 21.5 \\
+\addlinespace[2pt]
+M3 & B0 default & 10.3 {\scriptsize[8.2, 14.4]} & 1.00 & 15.6 & 1.00 & 1.000 & 28.0 \\
+ & B1 nice & 8.5 {\scriptsize[8.4, 11.5]} & 0.85 & 14.5 & 1.012 & 1.000 & 28.0 \\
+ & B2 cg-weight & 6.3 {\scriptsize[6.0, 7.5]} & 0.59 & 6.0 & 0.986 & 1.000 & 39.1 \\
+ & B3 slice & 10.6 {\scriptsize[7.1, 14.5]} & 0.86 & 18.2 & 0.996 & 1.000 & 24.1 \\
+ & WB-nice & 10.9 {\scriptsize[7.2, 17.3]} & 1.03 & 17.1 & 1.003 & 1.000 & 28.0 \\
+ & WB-slice & 11.6 {\scriptsize[7.0, 13.2]} & 1.09 & 18.0 & 1.008 & 1.000 & 28.4 \\
+\addlinespace[2pt]
+\multicolumn{8}{l}{\textit{Contention x4 (4 batch threads per core)}} \\
+M1 & B0 default & 5.7 {\scriptsize[5.0, 8.1]} & 1.00 & 1.5 & 1.00 & 0.951 & 41.0 \\
+ & B1 nice & 5.8 {\scriptsize[5.1, 8.0]} & 0.98 & 1.9 & 0.997 & 1.000 & 36.2 \\
+ & B2 cg-weight & 2.9 {\scriptsize[2.7, 4.4]} & 0.51 & 0.3 & 0.998 & 0.999 & 36.0 \\
+ & B3 slice & 6.0 {\scriptsize[5.8, 6.6]} & 1.13 & 9.8 & 1.005 & 1.000 & 37.0 \\
+ & WB-nice & 5.6 {\scriptsize[5.2, 7.5]} & 1.11 & 1.4 & 0.998 & 1.000 & 37.2 \\
+ & WB-slice & 6.0 {\scriptsize[5.3, 8.3]} & 1.02 & 2.1 & 1.003 & 0.988 & 36.8 \\
+\addlinespace[2pt]
+M2 & B0 default & 4.3 {\scriptsize[4.2, 5.2]} & 1.00 & 4.9 & 1.00 & 0.982 & 40.0 \\
+ & B1 nice & 4.8 {\scriptsize[4.3, 5.3]} & 1.04 & 5.7 & 0.991 & 0.961 & 45.3 \\
+ & B2 cg-weight & 2.3 {\scriptsize[2.1, 2.5]} & 0.51 & 0.8 & 0.994 & 0.994 & 36.0 \\
+ & B3 slice & 4.9 {\scriptsize[4.8, 4.9]} & 1.14 & 6.9 & 1.002 & 0.996 & 36.0 \\
+ & WB-nice & 4.8 {\scriptsize[4.0, 5.0]} & 0.99 & 5.5 & 0.996 & 0.996 & 36.6 \\
+ & WB-slice & 4.6 {\scriptsize[4.3, 4.7]} & 1.05 & 5.0 & 0.996 & 0.996 & 38.1 \\
+\addlinespace[2pt]
+M3 & B0 default & 11.9 {\scriptsize[8.8, 35.4]} & 1.00 & 20.4 & 1.00 & 0.998 & 80.0 \\
+ & B1 nice & 11.2 {\scriptsize[8.2, 29.1]} & 1.07 & 16.6 & 1.015 & 0.999 & 58.5 \\
+ & B2 cg-weight & 5.8 {\scriptsize[4.7, 8.3]} & 0.50 & 5.8 & 0.980 & 0.999 & 72.0 \\
+ & B3 slice & 17.5 {\scriptsize[10.2, 45.8]} & 1.30 & 22.3 & 1.013 & 0.997 & 60.2 \\
+ & WB-nice & 30.5 {\scriptsize[12.2, 55.5]} & 2.17 & 21.0 & 0.992 & 0.998 & 70.9 \\
+ & WB-slice & 24.6 {\scriptsize[9.4, 39.8]} & 1.38 & 20.7 & 0.998 & 0.999 & 71.8 \\
+\addlinespace[2pt]
+\bottomrule
+\end{tabular}
+\end{table*}

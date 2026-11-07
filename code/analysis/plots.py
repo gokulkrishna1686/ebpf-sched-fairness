@@ -7,6 +7,7 @@ Each figure is drawn only if its input batch is given. Run analysis/metrics.py a
 analysis/stats.py first, because this module reads <batch>_{runs,cells,paired,threads}.csv.
 """
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -53,6 +54,20 @@ def save(fig, out, name):
     print("  wrote", out / f"{name}.pdf")
 
 
+def frozen_theta(summary, raw, batch):
+    """The tuned theta (µs) waitboost-slice ran with in this batch: from the batch's policies.json,
+    else from the golden run's params_frozen_<ts>.json copy, else the default 500."""
+    pol = Path(raw) / batch / "policies.json"
+    if pol.exists():
+        return json.loads(pol.read_text())["waitboost-slice"]["schedmon"]["theta_us"]
+    ts = batch.split("_", 1)[-1]
+    pf = Path(summary) / f"params_frozen_{ts}.json"
+    if pf.exists():
+        data = json.loads(pf.read_text())
+        return data.get("by_actuator", {}).get("slice", {}).get("theta_us", data.get("theta_us", 500))
+    return 500
+
+
 def read(summary, batch, kind):
     p = summary / f"{batch}_{kind}.csv"
     try:
@@ -82,7 +97,10 @@ def fig_cdf(raw_batch, mix, out, conts=("x1", "x2", "x4")):
                 continue
             x = np.sort(np.concatenate(rts))
             y = np.arange(1, len(x) + 1) / len(x)
-            ax.plot(x, y, color=style.color(pol), label=style.label(pol), lw=1.1)
+            # B0 is the reference and often coincides with B1/WB curves: draw it dashed, on top.
+            ref = pol == "default"
+            ax.plot(x, y, color=style.color(pol), label=style.label(pol), lw=0.9 if ref else 1.1,
+                    ls=(0, (3, 1.5)) if ref else "-", zorder=5 if ref else 2)
         slo = runs[0].cfg["mix_params"].get("slo_ms") if runs else None
         ax.set_ylim(0.5, 1.0)  # the tail is the story
         if slo:
@@ -102,7 +120,7 @@ def _pareto_panel(ax, sub, title):
     ax.axvline(1, color=style.AXIS, lw=0.8)
     ax.plot([1], [1], marker=style.marker("default"), color=style.color("default"), ls="none", ms=5,
             mec="white", mew=0.6, label=style.label("default"))
-    ax.annotate("B0", (1, 1), xytext=(3, 3), textcoords="offset points", fontsize=6.5, color=style.INK_2)
+    # No direct labels: near (1, 1) they collide; the shared legend + distinct markers identify points.
     sub = sub.set_index("policy")
     for pol in style.ordered(sub.index):
         row = sub.loc[pol]
@@ -111,8 +129,6 @@ def _pareto_panel(ax, sub, title):
         yerr = [[y - row.rt_p99_us_ratio_lo], [row.rt_p99_us_ratio_hi - y]]
         ax.errorbar(x, y, xerr=xerr, yerr=yerr, fmt=style.marker(pol), color=style.color(pol), ms=5,
                     elinewidth=0.7, capsize=1.5, mec="white", mew=0.6, label=style.label(pol))
-        ax.annotate(SHORT.get(pol, pol), (x, y), xytext=(4, -2), textcoords="offset points", fontsize=6.5,
-                    color=style.INK_2)
     ax.set_title(title)
     ax.set_xlabel("batch throughput / B0")
 
@@ -152,7 +168,11 @@ def fig_waits(cells, mix, cont, out):
             v, lo, hi = c.loc[pol, col] / 1e3, c.loc[pol, col + "_lo"] / 1e3, c.loc[pol, col + "_hi"] / 1e3
             ax.plot([lo, hi], [k, k], color=style.color(pol), lw=1.0)
             ax.plot(v, k, marker=style.marker(pol), color=style.color(pol), ms=5, mec="white", mew=0.6)
-        plain_log(ax, "x")
+        vals = c[[col + "_lo", col + "_hi"]].to_numpy() / 1e3
+        if np.nanmax(vals) / max(np.nanmin(vals), 1e-9) > 4:
+            plain_log(ax, "x")
+        else:  # narrow range: a log axis would only crowd the labels
+            ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(4))
         ax.set_title(title)
         ax.set_xlabel("ms")
     a1.set_yticks(y, [style.label(p) for p in pols])
@@ -174,10 +194,11 @@ def fig_timeline(run, out, name="timeline_h1"):
     bad = worst.to_numpy() > slo
     a1.plot(t[bad], worst.to_numpy()[bad], ls="none", marker="o", ms=2.5, color=style.CRITICAL,
             label=f"SLO miss ({bad.sum()} of {len(bad)} windows)")
-    a1.axhline(slo, color=style.MUTED, lw=0.8, ls=(0, (3, 2)))
-    a1.text(t.max(), slo, "SLO ", ha="right", va="bottom", fontsize=6.5, color=style.INK_2)
+    a1.axhline(slo, color=style.MUTED, lw=0.8, ls=(0, (3, 2)), label=f"SLO ({slo:g} ms)")
     plain_log(a1, "y")
-    a1.legend(loc="upper right", fontsize=6)
+    lo = np.nanmin(worst.to_numpy())
+    a1.set_ylim(lo * 0.8, np.nanmax(worst.to_numpy()) * 2.6)  # headroom so the legend sits above the data
+    a1.legend(loc="upper right", fontsize=6, ncol=2)
     a1.set_ylabel("worst resp. (ms)")
     a1.set_title(f"{run.cfg['mix']}, {CONT_LABEL.get(run.cfg['contention'], '')}, B0 (seed {run.cfg['seed']})")
     ts = run.batch_ts
@@ -214,27 +235,41 @@ def fig_ablation(paired, out, cont="x2"):
     save(fig, out, "ablation")
 
 
-def fig_theta(paired, out, prefix="wbs-t", cont="x2"):
+def fig_theta(paired, out, frozen_theta, prefix="wbs-t", cont="x2"):
+    """frozen_theta: the theta (µs) that plain waitboost-slice ran with, i.e. the tuned value."""
     if paired is None:
         return
     p = paired[(paired.contention == cont) & (paired.policy.str.startswith(prefix) | (paired.policy == "waitboost-slice"))]
     if p.empty:
         return
-    fig, ax = plt.subplots(figsize=(style.COL_W, 2.0))
+    mixes = sorted(p.mix.unique())
+    fig, axes = plt.subplots(1, 2, figsize=(style.COL_W, 1.8), sharex=True)
+    thetas = set()
     for mix, g in p.groupby("mix"):
-        th = g.policy.map(lambda s: 500 if s == "waitboost-slice" else int(s[len(prefix):]))
-        g = g.assign(theta=th).sort_values("theta")
-        ax.plot(g.batch_tput_ratio, g.rt_p99_us_ratio, marker="o", ms=3.5, lw=1.0,
-                color=style.SLOTS[sorted(p.mix.unique()).index(mix)], label=mix)
-        for _, r in g.iterrows():
-            ax.annotate(f"{r.theta / 1000:g}", (r.batch_tput_ratio, r.rt_p99_us_ratio), xytext=(3, 2),
-                        textcoords="offset points", fontsize=6, color=style.INK_2)
-    ax.axhline(1, color=style.AXIS, lw=0.8)
-    ax.axvline(1, color=style.AXIS, lw=0.8)
-    ax.set_xlabel("batch throughput / B0")
-    ax.set_ylabel("interactive p99 / B0")
-    ax.set_title("WB-slice threshold sweep (labels: θ in ms)")
-    ax.legend(loc="best")
+        th = g.policy.map(lambda s: frozen_theta if s == "waitboost-slice" else int(s[len(prefix):]))
+        # The tuned theta can equal a sweep value: keep one point per theta (the sweep's own run).
+        g = g.assign(theta=th, tuned=g.policy == "waitboost-slice").sort_values(["theta", "tuned"])
+        g = g.drop_duplicates("theta", keep="first")
+        thetas |= set(g.theta / 1000)
+        k = mixes.index(mix)
+        for ax, col in zip(axes, ("rt_p99_us_ratio", "batch_tput_ratio")):
+            # Small horizontal offsets per mix so the CI bars do not sit on top of each other.
+            x = g.theta / 1000 * 2 ** ((k - (len(mixes) - 1) / 2) * 0.08)
+            ax.errorbar(x, g[col], yerr=[g[col] - g[col + "_lo"], g[col + "_hi"] - g[col]], marker=style.MARKERS[k],
+                        ms=3.5, lw=1.0, elinewidth=0.6, capsize=1.5, color=style.SLOTS[k], label=mix)
+    plain_log(axes[0], "y")  # one wide CI (5 seeds) would otherwise flatten the rest
+    for ax, title in zip(axes, ("interactive p99 / B0", "batch throughput / B0")):
+        ax.axhline(1, color=style.AXIS, lw=0.8)
+        ax.axvline(frozen_theta / 1000, color=style.MUTED, lw=0.8, ls=(0, (3, 2)),
+                   label=f"tuned θ = {frozen_theta / 1000:g} ms")
+        ax.set_xscale("log", base=2)
+        ax.set_xticks(sorted(thetas), [f"{v:g}" for v in sorted(thetas)])
+        ax.xaxis.set_minor_locator(matplotlib.ticker.NullLocator())
+        ax.set_xlabel("threshold θ (ms)")
+        ax.set_title(title)
+    h, lab = axes[0].get_legend_handles_labels()
+    fig.legend(h, lab, loc="lower center", ncol=len(lab), bbox_to_anchor=(0.5, -0.1), fontsize=6, frameon=False)
+    fig.tight_layout(rect=(0, 0.05, 1, 1), w_pad=1.2)
     save(fig, out, "theta_sweep")
 
 
@@ -247,8 +282,11 @@ def fig_validation(threads, out):
                 color=style.SLOTS[k], alpha=0.7, mec="none", label={"inter": "interactive", "batch": "batch"}[role])
     lim = [max(1e-3, threads.schedstat_delay_ns.min() / 1e6 * 0.8), threads.schedstat_delay_ns.max() / 1e6 * 1.2]
     ax.plot(lim, lim, color=style.INK_2, lw=0.8, ls=(0, (3, 2)))
-    plain_log(ax, "x")
-    plain_log(ax, "y")
+    for a in (ax.xaxis, ax.yaxis):  # ~5 decades: 1-2-5 labels would collide, so label decades only
+        (ax.set_xscale if a is ax.xaxis else ax.set_yscale)("log")
+        a.set_major_locator(matplotlib.ticker.LogLocator(base=10))
+        a.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:g}"))
+        a.set_minor_formatter(matplotlib.ticker.NullFormatter())
     ax.set_xlabel("kernel schedstat run_delay (ms)")
     ax.set_ylabel("eBPF total run-queue wait (ms)")
     err = (threads.ebpf_wait_ns.sum() - threads.schedstat_delay_ns.sum()) / threads.schedstat_delay_ns.sum()
@@ -257,32 +295,33 @@ def fig_validation(threads, out):
     save(fig, out, "validation")
 
 
-def fig_overhead(cells, out, mix="M1"):
-    if cells is None:
+def fig_overhead(runs, out, mix="M1"):
+    """Collector cost: each configuration relative to no collector, paired by seed (median, 95% CI)."""
+    if runs is None:
         return
-    c = cells[cells.mix == mix]
-    order = ["default-nocollector", "default-noevents", "default"]
-    names = {"default-nocollector": "no collector", "default-noevents": "maps only", "default": "maps + events"}
-    conts = sorted(c.contention.unique())
+    import stats  # analysis/stats.py (this directory is on sys.path)
+
+    pr = stats.paired(runs[runs.mix == mix], baseline="default-nocollector", metrics=["batch_tput", "rt_p99_us"])
+    if pr.empty:
+        return
+    order = ["default-noevents", "default"]
+    names = {"default-noevents": "maps only", "default": "maps + events"}
+    conts = sorted(pr.contention.unique())
     fig, axes = plt.subplots(1, 2, figsize=(style.COL_W, 1.75))
     for ax, col, title in zip(axes, ("batch_tput", "rt_p99_us"), ("batch throughput", "interactive p99")):
         for k, cfg in enumerate(order):
-            vals = []
-            for cont in conts:
-                base = c[(c.contention == cont) & (c.policy == order[0])][col]
-                v = c[(c.contention == cont) & (c.policy == cfg)][col]
-                vals.append(float(v.iloc[0] / base.iloc[0]) if len(v) and len(base) else np.nan)
-            ax.bar(np.arange(len(conts)) + (k - 1) * 0.27, vals, width=0.25, color=style.SLOTS[k], label=names[cfg],
-                   edgecolor="white", lw=0.6)
+            g = pr[pr.policy == cfg].set_index("contention").reindex(conts)
+            v = g[col + "_ratio"].to_numpy()
+            err = [v - g[col + "_ratio_lo"].to_numpy(), g[col + "_ratio_hi"].to_numpy() - v]
+            x = np.arange(len(conts)) + (k - 0.5) * 0.3
+            ax.bar(x, v - 1, bottom=1, width=0.28, color=style.SLOTS[k + 1], label=names[cfg], edgecolor="white", lw=0.6)
+            ax.errorbar(x, v, yerr=err, fmt="none", ecolor=style.INK_2, elinewidth=0.7, capsize=1.5)
         ax.axhline(1, color=style.INK_2, lw=0.8)
         ax.set_xticks(range(len(conts)), conts)
         ax.set_title(title)
-    lo = np.nanmin([b.get_height() for a in axes for b in a.patches])
-    for a in axes:
-        a.set_ylim(min(0.9, lo - 0.02), None)
-    axes[0].set_ylabel("relative to no collector")
+    axes[0].set_ylabel("ratio to no collector")
     h, lab = axes[0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.08), fontsize=6)
+    fig.legend(h, lab, loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.08), fontsize=6)
     fig.tight_layout(rect=(0, 0.06, 1, 1))
     save(fig, out, "overhead")
 
@@ -300,7 +339,7 @@ def fig_scaling(paired, out):
     ax.set_xticks(sorted(paired.cores.unique()))
     ax.set_xlabel("experiment cores")
     ax.set_ylabel("interactive p99 / B0")
-    ax.legend(ncol=2, fontsize=6)
+    ax.legend(ncol=4, fontsize=6, loc="lower center", bbox_to_anchor=(0.5, 1.0), frameon=False)
     save(fig, out, "scaling")
 
 
@@ -351,9 +390,9 @@ def main():
     if args.ablation:
         pa = read(S, args.ablation, "paired")
         fig_ablation(pa[~pa.policy.str.match(r"wb[sn]-t")] if pa is not None else None, O)
-        fig_theta(pa, O)
+        fig_theta(pa, O, frozen_theta(S, R, args.ablation))
     if args.overhead:
-        fig_overhead(read(S, args.overhead, "cells"), O)
+        fig_overhead(read(S, args.overhead, "runs"), O)
     if args.scaling:
         fig_scaling(read(S, args.scaling, "paired"), O)
 

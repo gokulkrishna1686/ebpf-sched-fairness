@@ -1,0 +1,36 @@
+\begin{table*}[t]
+\centering
+\footnotesize
+\caption{Held-out mix M4 (never used for tuning).}
+\label{tab:heldout}
+\begin{tabular}{llrrrrrr}
+\toprule
+Mix & Policy & p99 (ms) [95\% CI] & p99/B0 & SLO miss (\%) & Batch tput/B0 & Jain (norm.) & Batch max wait (ms) \\
+\midrule
+\multicolumn{8}{l}{\textit{Contention x1 (1 batch threads per core)}} \\
+M4 & B0 default & 25.3 {\scriptsize[19.9, 28.5]} & 1.00 & 3.5 & 1.00 & 0.997 & 16.3 \\
+ & B1 nice & 23.0 {\scriptsize[21.6, 29.3]} & 0.86 & 3.1 & 1.014 & 0.998 & 16.0 \\
+ & B2 cg-weight & 15.7 {\scriptsize[15.5, 17.0]} & 0.61 & 0.8 & 1.015 & 0.997 & 26.2 \\
+ & B3 slice & 27.7 {\scriptsize[24.7, 33.6]} & 1.11 & 4.7 & 1.016 & 0.998 & 15.8 \\
+ & WB-nice & 27.6 {\scriptsize[23.4, 29.8]} & 1.17 & 4.7 & 1.017 & 0.998 & 15.1 \\
+ & WB-slice & 25.9 {\scriptsize[22.5, 26.6]} & 1.05 & 3.8 & 0.999 & 0.997 & 16.0 \\
+\addlinespace[2pt]
+\multicolumn{8}{l}{\textit{Contention x2 (2 batch threads per core)}} \\
+M4 & B0 default & 28.5 {\scriptsize[24.6, 30.2]} & 1.00 & 5.3 & 1.00 & 0.999 & 31.7 \\
+ & B1 nice & 28.3 {\scriptsize[25.9, 33.9]} & 1.01 & 5.2 & 0.994 & 0.999 & 36.0 \\
+ & B2 cg-weight & 16.1 {\scriptsize[15.3, 18.8]} & 0.58 & 0.9 & 0.981 & 0.999 & 43.0 \\
+ & B3 slice & 30.4 {\scriptsize[27.9, 31.1]} & 1.06 & 5.7 & 1.000 & 0.999 & 32.1 \\
+ & WB-nice & 31.6 {\scriptsize[30.4, 35.0]} & 1.12 & 5.9 & 1.002 & 0.999 & 35.9 \\
+ & WB-slice & 26.4 {\scriptsize[25.7, 34.1]} & 1.07 & 5.0 & 0.995 & 0.999 & 32.6 \\
+\addlinespace[2pt]
+\multicolumn{8}{l}{\textit{Contention x4 (4 batch threads per core)}} \\
+M4 & B0 default & 27.2 {\scriptsize[23.8, 28.3]} & 1.00 & 4.4 & 1.00 & 0.999 & 68.0 \\
+ & B1 nice & 31.0 {\scriptsize[27.8, 36.6]} & 1.20 & 6.2 & 0.993 & 0.966 & 79.1 \\
+ & B2 cg-weight & 14.7 {\scriptsize[13.9, 18.3]} & 0.54 & 0.6 & 0.994 & 0.998 & 75.8 \\
+ & B3 slice & 32.5 {\scriptsize[23.9, 39.1]} & 1.22 & 7.0 & 1.008 & 0.966 & 71.7 \\
+ & WB-nice & 42.8 {\scriptsize[29.6, 57.6]} & 1.51 & 8.0 & 0.994 & 0.967 & 76.0 \\
+ & WB-slice & 27.0 {\scriptsize[21.7, 38.7]} & 1.01 & 4.8 & 0.978 & 0.962 & 68.0 \\
+\addlinespace[2pt]
+\bottomrule
+\end{tabular}
+\end{table*}
