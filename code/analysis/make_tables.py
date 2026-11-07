@@ -245,7 +245,7 @@ def repro_table(sysinfo, calib):
         ("Storage", _storage((sysinfo.get("storage") or {}).get("root_fs"))),
         # plain underscores: esc() below escapes every row once
         ("Kernel config", f"HZ={kc.get('CONFIG_HZ')}, PREEMPT_DYNAMIC={kc.get('CONFIG_PREEMPT_DYNAMIC')}, "
-                          f"SCHED_CLASS_EXT={kc.get('CONFIG_SCHED_CLASS_EXT')}"),
+                          f"SCHED_CLASS_EXT={kc.get('CONFIG_SCHED_CLASS_EXT')}, SCHEDSTATS={kc.get('CONFIG_SCHEDSTATS')}"),
         ("Scheduler", f"EEVDF, base slice {_ms(sch.get('base_slice_ns'))}, preemption mode {_preempt(sch.get('preempt'))}"),
         ("Compilers", f"{tc.get('gcc')}; {tc.get('clang')}"),
         ("BPF tooling", f"libbpf {tc.get('libbpf')}; {tc.get('bpftool')}; {tc.get('bpftrace')}"),
