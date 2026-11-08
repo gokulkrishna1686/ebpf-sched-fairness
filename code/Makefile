@@ -13,6 +13,8 @@
 #   make run CONFIG=main run one experiment config (needs root)
 #   make analyze BATCH=<batch id under results/raw>
 #   make fake            synthetic data to exercise the analysis without root
+#   make reproduce       regenerate the paper's numbers, tables and figures from the included raw
+#                        data and compare with results/summary, ~5 min (no root)
 #   make clean
 #
 # BPF objects are compiled with clang against a vmlinux.h generated from the running
@@ -36,7 +38,7 @@ BPF_CFLAGS := -O2 -g -Wall -target bpf -D__TARGET_ARCH_$(ARCH) -I$(BUILD) -Ibpf 
 
 QUICK_ID := quick_$(shell date +%Y%m%d-%H%M%S)
 
-.PHONY: all clean check-kernel selftest test quick pilot golden validate-trace run analyze fake
+.PHONY: all clean check-kernel selftest test quick pilot golden validate-trace run analyze fake reproduce
 
 all: $(BUILD)/wlgen $(BUILD)/schedmon
 
@@ -101,6 +103,9 @@ analyze:
 
 fake:
 	$(PYTHON) analysis/fake_data.py
+
+reproduce:
+	./tests/reproduce_paper.sh $(TS)
 
 clean:
 	rm -rf $(BUILD)

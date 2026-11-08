@@ -1,5 +1,5 @@
 {
-  "_status": "PROVISIONAL defaults. After the tuning run, write the output of analysis/tune.py here, commit, then tag the commit params-frozen before any evaluation run.",
+  "_status": "FROZEN 2026-11-06 18:08 by analysis/tune.py --write from tuning batch tuning_20261106-174432 (rule: lowest median p99 ratio among thetas whose median throughput ratio is >= 0.97). Written before any evaluation batch ran.",
   "interval_ms": 10,
   "theta_us": 500,
   "alpha": 0.3,
@@ -10,7 +10,11 @@
   "guard_ms": 100,
   "nice_step": 3,
   "by_actuator": {
-    "nice": {},
-    "slice": {}
+    "nice": {
+      "theta_us": 2000
+    },
+    "slice": {
+      "theta_us": 2000
+    }
   }
 }

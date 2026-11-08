@@ -1,0 +1,259 @@
+\documentclass[10.5pt,a4paper]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+\setlist{nosep,leftmargin=*}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\renewcommand{\arraystretch}{1.12}
+\lstset{basicstyle=\ttfamily\small,columns=fullflexible,keepspaces=true,frame=single,
+  rulecolor=\color{black!25},backgroundcolor=\color{black!3},breaklines=true,
+  aboveskip=6pt,belowskip=6pt,xleftmargin=3pt,xrightmargin=3pt,upquote=true}
+\newcommand{\f}[1]{\texttt{#1}}
+
+\title{\textbf{Code and Reproducibility Guide}\\[4pt]
+\large eBPF-Based Detection and Mitigation of CPU Scheduling Unfairness Under Mixed Workloads}
+\author{Gokul Krishna Balaji (CS24B2053) \and Garikina Asish Preetam (CS24I1022) \and
+Bhyrapuneni Venkat Manoj (CS24B2052) \and Karra Sunith Vardhan Singh (CS24B2017)\\[4pt]
+\normalsize Indian Institute of Information Technology, Design and Manufacturing, Kancheepuram}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+This document accompanies the project report and the code archive \f{Project\_Code.zip}. It explains the project code, its software dependencies, the configuration it needs, how to run it, and how to reproduce the reported results.
+
+\begin{center}
+\begin{tabularx}{\textwidth}{@{}lLl@{}}
+\toprule
+\textbf{Goal} & \textbf{What to do} & \textbf{Needs} \\
+\midrule
+Check the reported results & Regenerate every number, table and figure from the included raw data with \f{make reproduce} (\S\ref{sec:from-raw}) & No root, about 5 min \\
+Check that the code runs & Build and run the automatic tests (\S\ref{sec:setup}, \S\ref{sec:tests}) & Root, about 5 min \\
+Repeat the experiments & Run the whole study again with \f{make golden} (\S\ref{sec:full}) & Root, about 8 h \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\section{Contents of the code archive}
+
+\begin{lstlisting}
+ebpf-sched-fairness/
+  docs/Code_and_Reproducibility_Guide.pdf   this document
+  code/
+    README.md          short overview
+    INTERFACES.md      every file format and command-line option
+    Makefile           build and all entry points
+    workload/wlgen.c   workload generator
+    bpf/               eBPF programs, their loader, the WaitBoost policy
+    common/            sched_setattr helpers (nice and EEVDF custom slice)
+    harness/           experiment runner; configs/ holds every experiment definition
+    analysis/          metrics, statistics, figures and tables
+    setup/             machine provisioning, platform record, optional VM notes
+    tests/             automatic tests, the full study, the reproduction script
+    results/raw/       raw data of the reported run, packed (.tar.zst)
+    results/summary/   per-batch CSV summaries, logs and the frozen parameters
+\end{lstlisting}
+
+\section{The project code}
+
+\subsection{Components}
+\begin{tabularx}{\textwidth}{@{}l l L@{}}
+\toprule
+\textbf{Path} & \textbf{Language} & \textbf{Role} \\
+\midrule
+\f{workload/wlgen.c} & C & Generates the workload. \emph{Interactive} threads serve open-loop request arrivals (Poisson, on/off or periodic) drawn from a seed. \emph{Batch} threads run fixed CPU work units. Records the response time of every request and batch progress per 100\,ms. \\
+\f{bpf/schedmon.bpf.c} & eBPF (CO-RE) & Hooks \f{sched\_wakeup}, \f{sched\_wakeup\_new}, \f{sched\_switch} and \f{sched\_migrate\_task}. Measures each traced thread's run-queue wait, run time, context switches and migrations. \\
+\f{bpf/schedmon.c} & C (libbpf) & Loads the programs, streams wait events, writes per-thread statistics and optionally runs the WaitBoost policy. \\
+\f{harness/} & Python 3 & Creates the cgroups and cpuset, applies each policy, launches runs paired by seed in randomized order, records \f{meta.json}. Entry point: \f{run\_matrix.py}. \\
+\f{analysis/} & Python 3 & \f{metrics.py} (per-run metrics), \f{stats.py} (bootstrap CIs, paired ratios), \f{plots.py} (figures), \f{make\_tables.py} (LaTeX tables), \f{validate.py} (collector validation), \f{tune.py} (threshold selection), \f{paper\_numbers.py} (numbers quoted in the text). \\
+\f{tests/} & Bash, Python & \f{run\_all.sh} (automatic tests), \f{golden.sh} (full study), \f{check\_batch.py} (batch audit), \f{reproduce\_paper.sh} (regeneration from raw data). \\
+\bottomrule
+\end{tabularx}
+
+Data flow: \f{wlgen} runs the two thread classes in the sibling cgroups \f{/sys/fs/cgroup/fairexp/interactive} and \f{.../batch}. The eBPF programs update per-thread maps and a ring buffer. \f{schedmon} dumps them and, for WaitBoost policies, reads the maps every 10\,ms and adjusts a kernel knob. The harness stores each run in \f{results/raw/<batch>/<run\_id>/}, and the analysis turns those directories into \f{results/summary/<batch>\_\{runs,cells,paired,threads\}.csv}, then figures and tables. Run identifiers read \f{<mix>\_<contention>\_<policy>\_c<cores>\_s<seed>}. The main files of each run are \f{requests.csv} (response times), \f{batch.csv} and \f{batch\_ts.csv} (batch progress), \f{tasks.csv} and \f{events.csv} (eBPF measurements), \f{policy\_log.csv} (WaitBoost decisions), \f{schedmon\_stats.json} and \f{meta.json} (exact commands, configuration, code version, restore check). \f{code/INTERFACES.md} specifies every format.
+
+\subsection{Policies}
+\begin{tabularx}{\textwidth}{@{}l L l@{}}
+\toprule
+\textbf{Name} & \textbf{Description} & \textbf{Mechanism} \\
+\midrule
+B0 \f{default} & Stock EEVDF, nice 0, equal cgroup weights & none \\
+B1 \f{nice} & Every batch thread at nice 10 & \f{setpriority} \\
+B2 \f{cgweight} & Interactive cgroup weight 400, batch cgroup weight 100 & \f{cpu.weight} \\
+B3 \f{slice} & Every interactive thread requests a 0.3\,ms EEVDF slice & \f{sched\_setattr} \\
+\f{waitboost-nice} & WaitBoost; each level lowers nice by 3 & \f{setpriority} \\
+\f{waitboost-slice} & WaitBoost; each level halves the slice, never below 1.25 times the thread's measured CPU burst & \f{sched\_setattr} \\
+\f{waitboost-cg} & Per-class WaitBoost; each level doubles the interactive \f{cpu.weight} & \f{cpu.weight} \\
+\bottomrule
+\end{tabularx}
+
+WaitBoost applies these rules every 10\,ms, in order: (1) \emph{guard}: a thread runnable but not running for at least 100\,ms goes to the maximum level (3); (2) \emph{revoke}: a boosted thread whose CPU use exceeds 0.5 loses its boost; (3) \emph{boost}: a thread with sleep fraction at least 0.5, CPU use at most 0.5 and EWMA wait above $\theta$ gains one level; (4) \emph{decay}: otherwise the boost drops one level every 50\,ms. On exit, every changed knob is restored, and the harness verifies this after each run.
+
+\section{Software dependencies}
+
+\textbf{Operating system and kernel.} Ubuntu 26.04, on Linux 6.12 or newer (custom EEVDF slices need 6.12). The kernel must have \f{CONFIG\_BPF\_SYSCALL}, BTF (\f{CONFIG\_DEBUG\_INFO\_BTF}, visible as \f{/sys/kernel/btf/vmlinux}) and cgroup v2 with the \f{cpu} and \f{cpuset} controllers, and systemd must be running. No kernel patch and no \f{sched\_ext} are needed. \f{CONFIG\_SCHEDSTATS} is optional: the reported kernel did not have it.
+
+\textbf{Hardware.} At least 4 logical CPUs (CPU 0 for housekeeping, CPUs 1--3 for experiments), about 6\,GB of RAM and 3\,GB of free disk. Root access is required for new experiments, so use a disposable VM, WSL2 instance or lab machine, never a production host.
+
+\textbf{Packages.} \f{setup/provision.sh} installs everything from the Ubuntu archive. The versions used for the reported results were:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Package} & \textbf{Version} & \textbf{Purpose} \\
+\midrule
+clang & 21.1.8 & Compiles the eBPF programs \\
+gcc, make & 15.2.0 & Builds \f{wlgen} and \f{schedmon} \\
+libbpf (\f{libbpf-dev}) & 1.6.3 & eBPF loader library \\
+bpftool & 7.7.0 & Generates \f{vmlinux.h} and the libbpf skeleton \\
+trace-cmd & 3.3.3 & Independent trace for validation \\
+zstd & from Ubuntu 26.04 & Packs raw results \\
+Python & 3.14.4 & Harness and analysis \\
+numpy, pandas & 2.3.5, 2.3.3 & Analysis \\
+scipy, matplotlib & 1.16.3, 3.10.7 & Statistics, figures \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\f{provision.sh} also installs bpftrace and stress-ng; they are convenient for manual checks but were not used to produce any reported result. For \f{make reproduce}, only Python with the four analysis libraries, zstd and tar are required.
+
+\section{Setup and build}\label{sec:setup}
+Run these inside Ubuntu 26.04 (WSL2 or a VM; for a VirtualBox VM see \f{code/setup/vm/README.md}). Unpack the archive inside the Linux file system with \f{unzip}, not through Windows Explorer or under \f{/mnt/c}: this keeps the scripts executable and avoids slow disk access.
+\begin{lstlisting}[language=bash]
+sudo apt install -y unzip
+unzip Project_Code.zip -d ~ && cd ~/ebpf-sched-fairness/code
+sudo ./setup/provision.sh      # add --vm in a disposable VM
+make                           # builds build/wlgen and build/schedmon
+make selftest                  # must print PASS
+\end{lstlisting}
+\f{provision.sh} prints \f{ok} or \f{FAIL} for every kernel feature the study relies on. With \f{--vm} it also pins the kernel, enables passwordless sudo and disables noisy system timers, so use that flag only on a disposable VM.
+
+\section{Configuration}
+
+\textbf{Experiment definitions} are JSON files in \f{harness/configs/}; \f{configs/README.md} documents every key. The most important are \f{use\_mixes}, \f{contention} (batch threads per core), \f{policies}, \f{seeds}, \f{cores}, \f{warmup\_s}, \f{duration\_s}, and \f{isolate\_housekeeping} (confines system services to CPU 0). Experiment CPUs start at CPU 1. Each run has a 5\,s warm-up and a 30\,s measured window.
+
+\begin{center}
+\begin{tabularx}{\textwidth}{@{}lLlrr@{}}
+\toprule
+\textbf{Config} & \textbf{Factors} & \textbf{Seeds} & \textbf{Runs} & \textbf{Time} \\
+\midrule
+\f{tuning} & M1--M2, x2; $\theta \in \{0.25, 0.5, 1, 2\}$\,ms $\times$ \{nice, slice\}, plus B0 & 1--3 & 54 & 24 min \\
+\f{main} & M1--M3 $\times$ \{x1, x2, x4\} $\times$ 6 policies, plus x0 reference runs & 101--105 & 285 & 3 h 07 \\
+\f{heldout} & M4 (never tuned on) $\times$ \{x1, x2, x4\} $\times$ 6 policies, plus x0 & 101--105 & 95 & 1 h 02 \\
+\f{ablation} & M1--M3, x2: no aging, no feedback, $\theta$ sweep, per-class input & 101--105 & 180 & 1 h 59 \\
+\f{scaling} & M1, x2, on 1, 2 and 3 experiment cores & 101--105 & 75 & 49 min \\
+\f{overhead} & M1 $\times$ \{x1, x2, x4\}: no collector, maps only, maps + events & 101--105 & 45 & 29 min \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\textbf{Workload mixes} are defined in \f{configs/mixes.json}. Level x$k$ places $k$ batch threads on each experiment core; x0 has no batch threads.
+
+\begin{center}
+\begin{tabularx}{\textwidth}{@{}l c L L l@{}}
+\toprule
+\textbf{Mix} & \textbf{Threads} & \textbf{Arrivals} & \textbf{Work per request} & \textbf{SLO} \\
+\midrule
+M1 & 2 & Poisson, 100/s each & 1\,ms, fixed & 5\,ms \\
+M2 & 8 & Poisson, 50/s each & 0.5\,ms, fixed & 2.5\,ms \\
+M3 & 4 & On/off: 400/s for 100\,ms, then 400\,ms idle & Lognormal, median 0.5\,ms, $\sigma=0.5$ & 2.5\,ms \\
+M4 (held out) & 4 & Periodic 60\,Hz, $\pm$1\,ms jitter & Lognormal, median 2\,ms, $\sigma=0.6$ & 16.7\,ms \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\textbf{Frozen parameters.} \f{configs/params\_frozen.json} holds the WaitBoost parameters: interval 10\,ms, EWMA $\alpha=0.3$, minimum sleep fraction 0.5, CPU cap 0.5, maximum level 3, decay 50\,ms, guard 100\,ms, nice step 3, and $\theta=2$\,ms for the nice and slice actuators (0.5\,ms for the per-class variant). The archive ships the values used for the reported results. \f{tune.py} chooses $\theta$ using only the tuning seeds, by a rule fixed in advance: the lowest median p99 ratio among values whose median throughput ratio is at least 0.97. \f{make golden} repeats this tuning on the new machine and overwrites the file before any evaluation run, keeping a copy in \f{results/summary/params\_frozen\_<timestamp>.json}.
+
+\section{Reproducing the reported results}
+
+\subsection{From the included raw data (no root)}\label{sec:from-raw}
+\begin{lstlisting}[language=bash]
+cd ~/ebpf-sched-fairness/code
+make reproduce
+\end{lstlisting}
+This checks the SHA-256 of every archive, unpacks them under \f{results/raw/}, recomputes all metrics and statistics into \f{results/reproduced/summary/}, compares them column by column with \f{results/summary/}, repeats the collector validation, and rebuilds the figures and tables. It must end with \f{REPRODUCE: PASS} and report that all tables match. With a different NumPy version, the last digits of bootstrap intervals may differ.
+
+\subsection{Testing the code on your machine}\label{sec:tests}
+\begin{lstlisting}[language=bash]
+make test      # about 5 min, needs root
+\end{lstlisting}
+This runs the workload generator test, the collector self-test, the policy restore test for each actuator, an end-to-end quick matrix with audit, analysis and figures, and the trace validation. It prints PASS or FAIL for each. \f{make quick} runs only the 2-minute end-to-end matrix, and \f{make pilot} is a 1-hour rehearsal of the whole study with 4\,s runs. Pilot and quick figures carry a watermark so that they cannot be mistaken for results.
+
+\subsection{Re-running the whole study}\label{sec:full}
+Before starting on a Windows host, plug the laptop in, set the power mode to Best performance, set sleep to Never, pause Windows Update and close other applications. If the host sleeps, WSL or the VM freezes and runs fail.
+\begin{lstlisting}[language=bash]
+tmux new -s golden
+make golden                  # about 8 hours
+make golden TS=<timestamp>   # resume an interrupted run; finished runs are kept
+\end{lstlisting}
+The command tunes, freezes $\theta$, runs all five evaluation batches and the trace validation, audits every batch, analyzes them, and writes figures and tables to \f{../report/figures} and \f{../report/tables}. It ends with \f{GOLDEN RUN: ALL STAGES PASS}, and its log is \f{results/summary/golden\_<timestamp>.log}. \f{tests/check\_batch.py} marks as failed any run that took more than three times the typical wall time, since that indicates a host interruption. Delete such runs and resume. This decision uses wall time only, never the results. A single batch can be run with \f{make run CONFIG=main}.
+
+\subsection{Where each result comes from}
+Paths are relative to \f{results/reproduced/} after \f{make reproduce}.
+
+\begin{center}
+\begin{tabularx}{\textwidth}{@{}lLl@{}}
+\toprule
+\textbf{In the report} & \textbf{Content} & \textbf{File} \\
+\midrule
+Table I & Platform & \f{tables/tab\_repro.tex} \\
+Table II & Instrumentation overhead & \f{tables/tab\_overhead.tex} \\
+Table III & All policies in all cells & \f{tables/tab\_matrix.tex} \\
+Table IV & Ablations & \f{tables/tab\_ablation.tex} \\
+Fig.~1 & System diagram (drawn in the LaTeX source) & -- \\
+Fig.~2 & Per-thread validation & \f{figures/validation.pdf} \\
+Fig.~3 & Unfairness timeline & \f{figures/timeline\_h1.pdf} \\
+Fig.~4 & Response-time distribution & \f{figures/cdf\_M1.pdf} \\
+Fig.~5 & Run-queue waits & \f{figures/waits\_M1\_x4.pdf} \\
+Fig.~6 & Threshold sweep & \f{figures/theta\_sweep.pdf} \\
+Text, \S IV-A & Trace validation and noise floor & \f{summary/validation\_<timestamp>.txt} \\
+Text, all of \S IV & Pooled statistics and other quoted numbers & \f{paper\_numbers.txt} \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{The reported run}
+All results come from one golden run, timestamp \f{20261106-174432}, on an Intel Core i5-1155G7 laptop (8 logical CPUs, 7.6\,GiB) running Ubuntu 26.04.1 under WSL2, kernel \f{6.18.54.1-microsoft-standard-WSL2}, \f{HZ=250}, EEVDF base slice 2.8\,ms. It took 7 h 50 min, used code commit \f{0a95074} (recorded in every \f{meta.json}) with the frozen parameters above, and finished with every stage passing. No run failed in any batch, and no run was interrupted or re-run. The experiment code in this archive (\f{bpf/}, \f{workload/}, \f{harness/}) is the code of that run.
+
+\section{Checking a reproduction}
+\begin{itemize}
+\item \textbf{Collector accuracy.} \f{validate.py --trace} must print \f{PASS}: at least 95\% of waits matched against the raw trace, median difference at most 5\,\textmu s, p99 at most 20\,\textmu s. The reported run matched 706 of 706 waits with a median of 0.12\,\textmu s. \f{validate.py --threads} compares each thread's total with the kernel's \f{run\_delay}.
+\item \textbf{Event loss and safety.} \f{events\_dropped} and \f{restore\_errors} must be 0, as they were in the reported run. \f{check\_batch.py} must report 0 FAIL for every batch. It may print WARN when a thread started slightly late; these appear in the reported run too and do not indicate a failure.
+\item \textbf{Platform noise.} \f{validate.py --noise} measures idle wake-up lag; its verdict should be \f{OK} (p99 below 1\,ms). The reported run had 0.48\,ms.
+\item \textbf{Expected variation.} Absolute latencies depend on the machine and hypervisor. The claims are the comparisons against B0. On another machine, B2 should still lower interactive p99 in every cell, and the per-task policies should stay near or above 1. Differences below about 10\% are within the noise of five seeds.
+\end{itemize}
+
+\section{Troubleshooting}
+\begin{tabularx}{\textwidth}{@{}l L@{}}
+\toprule
+\textbf{Symptom} & \textbf{Cause and fix} \\
+\midrule
+\f{Permission denied} on a script & The archive was unpacked by Windows, which drops the executable bits. Unpack with \f{unzip} inside Linux, or run \f{chmod +x tests/* setup/*}. \\
+\f{/usr/bin/env: 'bash\textbackslash r'} & Windows line endings were introduced. Unpack the original archive again inside Linux. \\
+Failed to load BPF programs, \f{EPERM} & Not running as root. The \f{make} targets call \f{sudo} where needed. \\
+\f{bpftool btf dump} fails & The kernel has no BTF. Use a stock distribution kernel or the default WSL2 kernel. \\
+Cannot join the cgroup & Controllers \f{cpu} or \f{cpuset} are missing. Rerun \f{provision.sh} and check \f{/sys/fs/cgroup/cgroup.controllers}. \\
+\f{isolate\_housekeeping} errors in WSL2 & systemd is off. Set \f{systemd=true} under \f{[boot]} in \f{/etc/wsl.conf}, then run \f{wsl --shutdown}. \\
+Runs fail with \f{timed out} & The host slept or stalled. Keep it awake, then resume with \f{make golden TS=<timestamp>}. \\
+Noisy latencies, noise verdict not \f{OK} & Host load. Close other applications, use mains power and Best performance mode, and repeat \f{make quick}. \\
+\bottomrule
+\end{tabularx}
+
+\section{Known limitations}
+The measurements come from one laptop under WSL2 and one kernel version. The platform's own wake-up lag (0.48\,ms p99) sets a floor under absolute latencies. Five seeds per cell resolve only effects of roughly 10\% or more. The workloads are synthetic. Parameters were tuned on M1--M2, and generalization was checked only on M4. The scaling runs did not include B2.
+
+\section{Third-party software}
+The project uses Linux (GPL-2.0), libbpf (LGPL-2.1 or BSD-2-Clause), bpftool, clang/LLVM (Apache-2.0 with LLVM exception), trace-cmd (GPL-2.0), and NumPy, pandas, SciPy and Matplotlib (BSD or PSF-style licenses). These are cited in the report. No external dataset is used; all data were generated by this project. The eBPF program is GPL-licensed, as the kernel's helpers require, and the rest of the code is MIT-licensed.
+
+\end{document}

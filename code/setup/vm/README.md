@@ -1,7 +1,7 @@
 # Experiment VM (VirtualBox + Ubuntu 26.04 LTS Server)
 
-Every final result comes from this disposable VM, so its settings are part of the experiment. Record any deviation in
-`meta.json`. `sysinfo.py` captures most of these settings automatically.
+This is an optional alternative to WSL2 for running the experiments. The paper's results came from Ubuntu 26.04 under
+WSL2. If you use a VM, its settings are part of the experiment; `sysinfo.py` records most of them automatically.
 
 ## 1. Create the VM (Windows PowerShell)
 

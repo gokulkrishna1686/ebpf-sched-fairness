@@ -35,43 +35,29 @@ analysis (Python)  metrics → bootstrap CIs + paired tests → figures + LaTeX 
 | `results/raw/` | One directory per batch (packed to `.tar.zst` for git) |
 | `results/summary/` | `<batch>_{runs,cells,paired,threads}.csv` |
 
-## Quick start (inside the Ubuntu 26.04 VM or WSL2)
+## Reproducing the paper
+
+The full instructions are in `Code_and_Reproducibility_Guide.pdf` (in `docs/` next to this folder). In short:
 
 ```bash
-sudo ./setup/provision.sh --vm         # drop --vm on WSL2
+# 1. Regenerate every number, table and figure from the included raw data (no root, ~5 min)
+make reproduce
+
+# 2. Set up a machine for new experiments (Ubuntu 26.04 under WSL2, or a VM)
+sudo ./setup/provision.sh              # add --vm in a disposable VM
 make                                   # build/wlgen, build/schedmon
 make selftest                          # loads the BPF programs, prints PASS + schedstat comparison
-make quick                             # ~2 min: 8 runs → metrics → figures in results/quick_figures/
+make test                              # ~5 min: all automatic tests with a PASS/FAIL summary
+
+# 3. Re-run the whole study (about 8 hours; keep the machine awake and plugged in)
+make golden                            # tuning → freeze θ → all batches → audits → figures → tables
+make golden TS=<timestamp>             # resume an interrupted run
 ```
 
-**Testing and the golden run** are described step by step, with pass criteria, in [`../docs/TESTING.md`](../docs/TESTING.md).
-The automated checks are `tests/wlgen_smoke.sh` (no root), `tests/restore_test.py` and `tests/check_batch.py`.
+`harness/configs/params_frozen.json` holds the values used for the paper. `make golden` tunes on the new
+machine and overwrites it; a copy of the paper's values is in `results/summary/params_frozen_20261106-174432.json`.
 
-## Full study (in this order)
-
-```bash
-make run CONFIG=tuning                 # seeds 1-3, M1-M2 only
-#   pick θ etc. → edit harness/configs/params_frozen.json → git commit → git tag params-frozen
-make run CONFIG=main                   # ~3.1 h
-make run CONFIG=heldout                # ~1.0 h
-make run CONFIG=ablation               # ~2.0 h
-make run CONFIG=scaling                # ~0.8 h
-make run CONFIG=overhead               # ~0.5 h
-make validate-trace                    # hand-checkable trace vs eBPF
-```
-
-Then analyze. This runs on Windows or Linux, and needs only numpy, pandas, scipy and matplotlib:
-
-```bash
-python analysis/metrics.py results/raw/<main_id> results/raw/<heldout_id> ...
-python analysis/stats.py results/summary/<id>_runs.csv ...
-python analysis/plots.py --main <main_id> --heldout <id> --ablation <id> --overhead <id> --scaling <id>
-python analysis/make_tables.py --main <main_id> --heldout <id> --overhead <id> --ablation <id>
-python analysis/validate.py --trace results/raw/validation_<ts> --threads results/summary/<main_id>_threads.csv
-```
-
-Figures go to `../report/figures/` and tables to `../report/tables/`. The paper quotes numbers only through
-the macros in `tables/numbers.tex`.
+`make golden` writes figures to `../report/figures/` and tables to `../report/tables/`.
 
 ## Testing without root
 
@@ -81,6 +67,6 @@ Never put them in the report.
 
 ## Safety
 
-- Experiments run only in the disposable VM.
+- Run experiments only on a disposable VM, WSL2 instance or lab machine, never on a production host.
 - schedmon restores every nice value, slice and `cpu.weight` it changed on exit or signal. The harness verifies this after every run (`restore_check` in `meta.json`) and kills a run that overruns.
 - The starvation guard bounds how long any traced thread can wait.

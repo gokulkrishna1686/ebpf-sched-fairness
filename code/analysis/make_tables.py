@@ -211,6 +211,18 @@ def ablation_table(runs, caption, label):
     return "\n".join(lines) + "\n"
 
 
+def _cpu_name(s):
+    """'11th Gen Intel(R) Core(TM) i5-1155G7 @ 2.50GHz' -> 'Intel Core i5-1155G7'."""
+    s = re.sub(r"\((R|TM)\)", "", str(s or "")).split(" @")[0]
+    return re.sub(r"^\d+th Gen ", "", s).strip()
+
+
+def _version(s):
+    """First x.y.z in a tool's version banner; 'gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0' -> '15.2.0'."""
+    m = re.search(r"\d+\.\d+\.\d+", str(s or ""))
+    return m.group(0) if m else s
+
+
 def _storage(df_line):
     """'/dev/sdd ext4 1007G 2.9G 953G 1% /' -> 'ext4, 1007G'."""
     f = str(df_line or "").split()
@@ -240,17 +252,16 @@ def repro_table(sysinfo, calib):
         ("Distribution", sysinfo.get("distro")),
         ("Kernel", sysinfo.get("kernel_release")),
         ("Virtualization", f"{sysinfo.get('virtualization')} (clocksource {sysinfo.get('clocksource')})"),
-        ("CPU", f"{cpu.get('Model name')} ({cpu.get('CPU(s)')} vCPU)"),
+        ("CPU", f"{_cpu_name(cpu.get('Model name'))} ({cpu.get('CPU(s)')} vCPU)"),
         ("Memory", f"{(sysinfo.get('mem_total_kib') or 0) / 1048576:.1f} GiB"),
         ("Storage", _storage((sysinfo.get("storage") or {}).get("root_fs"))),
         # plain underscores: esc() below escapes every row once
         ("Kernel config", f"HZ={kc.get('CONFIG_HZ')}, PREEMPT_DYNAMIC={kc.get('CONFIG_PREEMPT_DYNAMIC')}, "
                           f"SCHED_CLASS_EXT={kc.get('CONFIG_SCHED_CLASS_EXT')}, SCHEDSTATS={kc.get('CONFIG_SCHEDSTATS')}"),
         ("Scheduler", f"EEVDF, base slice {_ms(sch.get('base_slice_ns'))}, preemption mode {_preempt(sch.get('preempt'))}"),
-        ("Compilers", f"{tc.get('gcc')}; {tc.get('clang')}"),
-        ("BPF tooling", f"libbpf {tc.get('libbpf')}; {tc.get('bpftool')}; {tc.get('bpftrace')}"),
+        ("Compilers", f"gcc {_version(tc.get('gcc'))}; clang {_version(tc.get('clang'))}"),
+        ("BPF tooling", f"libbpf {tc.get('libbpf')}; {tc.get('bpftool')}; {str(tc.get('trace-cmd')).split(' (')[0]}"),
         ("Analysis", f"Python {py.get('python')}, numpy {py.get('numpy')}, pandas {py.get('pandas')}, scipy {py.get('scipy')}"),
-        ("Spin calibration", f"{calib.get('iters_per_us', float('nan')):.1f} iterations/\\textmu s"),
     ]
     lines = ["\\begin{table}[t]", "\\centering", "\\footnotesize", "\\caption{Experimental platform (from sysinfo.json).}",
              "\\label{tab:repro}", "\\begin{tabular}{@{}l>{\\raggedright\\arraybackslash}p{0.72\\columnwidth}@{}}",

@@ -12,7 +12,7 @@
 
 **Rules.**
 - Tune only with `tuning.json`.
-- Write the chosen values into `params_frozen.json`, commit, and `git tag params-frozen`. Only then run the evaluation configs.
+- `analysis/tune.py --write` (run automatically by `make golden`) writes the chosen values into `params_frozen.json`. Only then run the evaluation configs. The file in this folder holds the values used for the paper.
 - Never select runs after the fact. `failed_runs.csv` lists everything that failed, and the paper reports it.
 
 ## Keys

@@ -11,6 +11,7 @@ __pycache__/
 # Raw per-run directories are packed into results/raw/<batch>.tar.zst before committing
 code/results/raw/*/
 code/results/fake/
+code/results/reproduced/
 code/results/quick_figures/
 code/results/pilot_figures/
 code/results/raw/pilot_*
@@ -28,6 +29,9 @@ report/*.fls
 report/*.fdb_latexmk
 report/*.synctex.gz
 
+# Final hand-in files (built from the repository)
+submission/
+
 # Course material (not ours to redistribute)
 *.docx
 ~$*
@@ -37,3 +41,11 @@ report/*.synctex.gz
 .idea/
 .DS_Store
 Thumbs.db
+
+# LaTeX build artifacts of the guide
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.fls
+docs/*.fdb_latexmk
+docs/*.synctex.gz

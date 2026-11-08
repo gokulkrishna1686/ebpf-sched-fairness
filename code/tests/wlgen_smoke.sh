@@ -13,7 +13,7 @@ check() { if eval "$2"; then echo "PASS  $1"; else echo "FAIL  $1"; fail=1; fi; 
 
 # 1. Calibration: three runs within 5% of each other. A larger spread is a WARN, not a FAIL: it
 #    means the host moves this VM's vCPUs between fast and slow cores (hybrid CPUs) or is
-#    throttling. Fix the host before a golden run (see docs/TESTING.md, "Host noise gate").
+#    throttling. Fix the host before a golden run (see the "Troubleshooting" section of the guide).
 r=()
 for i in 1 2 3; do r+=("$($W calibrate --trials 5 | python3 -c 'import json,sys; print(json.load(sys.stdin)["iters_per_us"])')"); done
 IPU=${r[1]}

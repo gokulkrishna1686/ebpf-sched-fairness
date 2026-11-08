@@ -85,7 +85,7 @@ def fig_cdf(raw_batch, mix, out, conts=("x1", "x2", "x4")):
     conts = [c for c in conts if any(r.cfg["contention"] == c for r in runs)]
     if not conts:
         return
-    fig, axes = plt.subplots(1, len(conts), figsize=(style.PAGE_W * max(len(conts), 2) / 3, 1.9), sharey=True)
+    fig, axes = plt.subplots(1, len(conts), figsize=(style.PAGE_W * max(len(conts), 2) / 3, 1.55), sharey=True)
     for ax, cont in zip(np.atleast_1d(axes), conts):
         for pol in style.ordered({r.cfg["policy"] for r in runs if r.cfg["contention"] == cont}):
             rts = []
@@ -111,7 +111,7 @@ def fig_cdf(raw_batch, mix, out, conts=("x1", "x2", "x4")):
         ax.set_xlabel("response time (ms)")
     np.atleast_1d(axes)[0].set_ylabel("CDF (upper half)")
     h, lab = np.atleast_1d(axes)[0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="upper center", ncol=len(lab), bbox_to_anchor=(0.5, 1.10))
+    fig.legend(h, lab, loc="upper center", ncol=len(lab), bbox_to_anchor=(0.5, 1.14))
     save(fig, out, f"cdf_{mix}")
 
 
@@ -162,7 +162,7 @@ def fig_waits(cells, mix, cont, out):
     pols = style.ordered(c.policy.unique())
     c = c.set_index("policy").loc[pols]
     y = np.arange(len(pols))
-    fig, (a1, a2) = plt.subplots(1, 2, figsize=(style.COL_W, 1.7), sharey=True)
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(style.COL_W, 1.45), sharey=True)
     for ax, col, title in ((a1, "wait_inter_p99_us", "interactive wait p99"), (a2, "wait_batch_max_us", "batch max wait")):
         for k, pol in enumerate(pols):
             v, lo, hi = c.loc[pol, col] / 1e3, c.loc[pol, col + "_lo"] / 1e3, c.loc[pol, col + "_hi"] / 1e3
@@ -188,7 +188,7 @@ def fig_timeline(run, out, name="timeline_h1"):
     win = ((m.t_arrival_ns - t0) // 100_000_000).astype(int)
     worst = ((m.t_end_ns - m.t_arrival_ns) / 1e6).groupby(win).max()
     slo = run.cfg["mix_params"].get("slo_ms", 10)
-    fig, (a1, a2) = plt.subplots(2, 1, figsize=(style.COL_W, 2.3), sharex=True, gridspec_kw={"height_ratios": [2, 1]})
+    fig, (a1, a2) = plt.subplots(2, 1, figsize=(style.COL_W, 1.95), sharex=True, gridspec_kw={"height_ratios": [2, 1]})
     t = worst.index * 0.1
     a1.plot(t, worst.to_numpy(), color=style.color("default"), lw=0.9)
     bad = worst.to_numpy() > slo
@@ -243,7 +243,7 @@ def fig_theta(paired, out, frozen_theta, prefix="wbs-t", cont="x2"):
     if p.empty:
         return
     mixes = sorted(p.mix.unique())
-    fig, axes = plt.subplots(1, 2, figsize=(style.COL_W, 1.8), sharex=True)
+    fig, axes = plt.subplots(1, 2, figsize=(style.COL_W, 1.5), sharex=True)
     thetas = set()
     for mix, g in p.groupby("mix"):
         th = g.policy.map(lambda s: frozen_theta if s == "waitboost-slice" else int(s[len(prefix):]))
@@ -268,8 +268,8 @@ def fig_theta(paired, out, frozen_theta, prefix="wbs-t", cont="x2"):
         ax.set_xlabel("threshold θ (ms)")
         ax.set_title(title)
     h, lab = axes[0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="lower center", ncol=len(lab), bbox_to_anchor=(0.5, -0.1), fontsize=6, frameon=False)
-    fig.tight_layout(rect=(0, 0.05, 1, 1), w_pad=1.2)
+    fig.tight_layout(rect=(0, 0.03, 1, 1), w_pad=1.2)
+    fig.legend(h, lab, loc="lower center", ncol=len(lab), bbox_to_anchor=(0.5, -0.12), fontsize=6, frameon=False)
     save(fig, out, "theta_sweep")
 
 

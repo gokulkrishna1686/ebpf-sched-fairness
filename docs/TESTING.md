@@ -407,7 +407,7 @@ This writes `report/figures/*.pdf` and `report/tables/*.tex` (including `numbers
 - [ ] The validation numbers come from T4 and `--threads`, and the noise floor from `--noise`. All are stated in Results.
 - [ ] The reproducibility table (`tab_repro.tex`) matches the golden VM, and the commit and tag are given in the reproducibility guide.
 - [ ] The negative results ("where WaitBoost does not help") are in Results.
-- [ ] The `⟨fill⟩` markers in `docs/reproducibility_guide.md` are filled.
+- [ ] `docs/Code_and_Reproducibility_Guide.pdf` matches the final run.
 
 ---
 
