@@ -213,6 +213,6 @@ Table~\ref{tab:ablation} confirms the diagnosis. Removing aging or wait feedback
 EEVDF keeps long-run CPU shares fair but lets batch contention inflate interactive p99 by up to 4$\times$ in episodes lasting seconds, which only per-thread run-queue telemetry reveals. The mitigation result is a practical warning: when interactive and batch work live in different cgroups, as under systemd and container runtimes, nice values and EEVDF custom slices cannot move CPU time between them, and boosting those knobs, however carefully bounded, accomplishes nothing. Class-level \cpuweight{} does, with no measurable throughput cost while the latency-sensitive class is demand-limited, and WaitBoost on that knob adds bounded, self-revoking control. \textit{Limitations}: all runs used one laptop under WSL2, whose 0.48\ms{} p99 wake-up lag sets a floor on absolute latency, and one kernel version. Five seeds per cell resolve only effects of roughly 10\% or more. The workloads are synthetic spin loops, and the scaling runs did not include B2. Future work should test an adversarial, CPU-hungry interactive class, where WaitBoost's guard and revocation matter, and port the policy to \texttt{sched\_ext}, where it could act within the hierarchy rather than across it.
 
 \bibliographystyle{IEEEtran}
-\bibliography{refs}
+\bibliography{references}
 
 \end{document}

@@ -37,7 +37,7 @@ analysis (Python)  metrics → bootstrap CIs + paired tests → figures + LaTeX 
 
 ## Reproducing the paper
 
-The full instructions are in `Code_and_Reproducibility_Guide.pdf` (in `docs/` next to this folder). In short:
+The full instructions are in `reproducibility_guide.pdf` (in `documentation/` next to this folder). In short:
 
 ```bash
 # 1. Regenerate every number, table and figure from the included raw data (no root, ~5 min)

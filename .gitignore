@@ -30,7 +30,7 @@ report/*.fdb_latexmk
 report/*.synctex.gz
 
 # Final hand-in files (built from the repository)
-submission/
+/submission/
 
 # Course material (not ours to redistribute)
 *.docx

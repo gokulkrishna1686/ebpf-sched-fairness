@@ -1,0 +1,10 @@
+# Python packages for the harness and the analysis, at the versions used for the reported results.
+#   pip install -r requirements.txt
+# On Ubuntu 26.04, setup/provision.sh installs the same packages from the distribution instead
+# (python3-numpy, python3-pandas, python3-scipy, python3-matplotlib). If these exact versions are not
+# available for your Python, unpinned versions also work; only the last digits of bootstrap intervals
+# may differ. System packages (clang, libbpf, bpftool, trace-cmd, zstd, ...) are listed in setup/provision.sh.
+numpy==2.3.5
+pandas==2.3.3
+scipy==1.16.3
+matplotlib==3.10.7
